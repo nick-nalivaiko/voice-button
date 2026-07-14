@@ -69,6 +69,15 @@ Tune window detection, Copy discovery, clipboard restoration, microphone retry b
 
 A self-contained portable build includes the .NET runtime and does not require a separate .NET installation.
 
+## Download
+
+Get the current Windows release from [GitHub Releases](https://github.com/nick-nalivaiko/VoiceButton/releases/latest):
+
+- **Installer**: recommended for a normal per-user Windows installation with Start menu and uninstall support.
+- **Portable ZIP**: extract anywhere and run without installation or a separate .NET runtime.
+
+Neither release package contains an OpenAI API key. Enter your own key in **Speech** after the first launch.
+
 ## Build and run
 
 ```powershell

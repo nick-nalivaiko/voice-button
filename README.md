@@ -121,6 +121,19 @@ Keys saved from the app are stored as a generic Windows credential named `VoiceB
 
 For local development only, `.env.example` can be copied to `.env`; never commit the resulting file.
 
+The repository includes layered leak prevention:
+
+- `scripts/check-secrets.ps1` scans tracked files, staged changes, or the complete reachable Git history without printing secret values.
+- `.githooks/pre-commit` blocks suspicious staged content locally.
+- GitHub Actions scans the complete history on every push and pull request.
+- `scripts/build-release.ps1` refuses to package a release unless the history scan passes and the portable inventory contains exactly the expected three files.
+
+Enable the local hook in a fresh clone with:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
 ## How it works
 
 1. Voice Button identifies the active supported application.

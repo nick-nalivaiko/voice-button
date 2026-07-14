@@ -5,21 +5,42 @@ obj/
 .vscode/
 *.user
 *.suo
-*.log
 
-# Local secrets
+# Local secrets and credentials
 .env
-.env.local
+.env.*
+!.env.example
+secrets/
+credentials.json
+*.secret
+*.secrets
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+*.jks
+*.keystore
+
+# Logs and local application state
+*.log
+logs/
+data/
+settings.json
+diagnostics.log
 
 # Build and release output
 publish/
 artifacts/
 Voice Button - PORTABLE RELEASE/
 
-# Local launchers and archived runtimes
+# Local launchers, runtimes, and archives
 *.lnk
 .dotnet/
 .dotnet.zip
+*.zip
+*.7z
+*.rar
 
 # Local agent and design working files
 .agents/
@@ -27,3 +48,9 @@ Voice Button - PORTABLE RELEASE/
 audit-screens/
 user docs/
 design-qa.md
+
+# Temporary and OS files
+*.tmp
+.DS_Store
+Thumbs.db
+desktop.ini

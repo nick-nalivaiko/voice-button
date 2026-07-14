@@ -34,6 +34,16 @@ if (-not $iscc) {
     throw 'Inno Setup compiler (ISCC.exe) was not found.'
 }
 
+$secretScanner = Join-Path $repoRoot 'scripts\check-secrets.ps1'
+& $secretScanner
+if ($LASTEXITCODE -ne 0) {
+    throw 'Tracked-file secret scan failed. Release packaging was stopped.'
+}
+
+& $secretScanner -History
+if ($LASTEXITCODE -ne 0) {
+    throw 'Git-history secret scan failed. Release packaging was stopped.'
+}
 $publishDir = Join-Path $releaseRoot 'publish'
 $portableDir = Join-Path $releaseRoot 'portable'
 [IO.Directory]::CreateDirectory($publishDir) | Out-Null
@@ -69,10 +79,20 @@ Copy-Item -LiteralPath $publishedExe -Destination (Join-Path $portableDir 'Voice
 [IO.File]::WriteAllText((Join-Path $portableDir 'portable.mode'), "portable$([Environment]::NewLine)")
 Copy-Item -LiteralPath (Join-Path $repoRoot 'installer\README-PORTABLE.txt') -Destination (Join-Path $portableDir 'README.txt')
 
-$forbiddenPortableFiles = Get-ChildItem -LiteralPath $portableDir -Recurse -Force -File |
-    Where-Object { $_.Name -like '.env*' -or $_.Name -eq 'settings.json' -or $_.Name -eq 'diagnostics.log' }
+$portableFiles = @(Get-ChildItem -LiteralPath $portableDir -Recurse -Force -File)
+$forbiddenPortableFiles = $portableFiles | Where-Object {
+    $_.Name -like '.env*' -or
+    $_.Name -in @('settings.json', 'diagnostics.log', 'credentials.json') -or
+    $_.Extension -in @('.pfx', '.p12', '.pem', '.key', '.snk', '.jks', '.keystore')
+}
 if ($forbiddenPortableFiles) {
-    throw 'Portable staging contains local secrets, settings, or diagnostics.'
+    throw 'Portable staging contains secrets, local settings, diagnostics, or private-key material.'
+}
+
+$expectedPortableNames = @('Voice Button Portable.exe', 'portable.mode', 'README.txt') | Sort-Object
+$actualPortableNames = @($portableFiles | ForEach-Object { $_.Name } | Sort-Object)
+if (@(Compare-Object -ReferenceObject $expectedPortableNames -DifferenceObject $actualPortableNames).Count -ne 0) {
+    throw "Portable staging contains an unexpected file inventory: $($actualPortableNames -join ', ')"
 }
 
 $portableZip = Join-Path $releaseRoot "VoiceButton-Portable-v$Version-win-x64.zip"

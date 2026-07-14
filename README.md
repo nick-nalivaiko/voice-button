@@ -26,7 +26,7 @@ Voice Button is a compact Windows companion for **Codex** and **ChatGPT**. It co
 
 ## Floating controls
 
-The compact control stays out of the way until playback starts. During speech it expands into a 274 px player with a 27-segment seekable waveform.
+The compact control stays out of the way until playback starts. During speech it expands into a 274 px player with a 27-segment seekable waveform. Stop collapses the player immediately; the next speech action resumes unfinished audio, while a completed unchanged answer replays from the in-memory cache.
 
 | Compact control | Playback control |
 | --- | --- |

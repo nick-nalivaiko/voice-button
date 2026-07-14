@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
 using VoiceButton.Models;
 using VoiceButton.Services;
@@ -54,7 +55,27 @@ public partial class FloatingButtonWindow : Window
     {
         KeepTargetApplicationActive();
         ApplyInitialPosition();
+        UpdateContentClip();
         ApplyPlaybackVisual();
+    }
+
+    private void ContentClip_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateContentClip();
+    }
+
+    private void UpdateContentClip()
+    {
+        if (ContentClip.ActualWidth <= 0 || ContentClip.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        var radius = ContentClip.ActualHeight / 2;
+        ContentClip.Clip = new RectangleGeometry(
+            new Rect(0, 0, ContentClip.ActualWidth, ContentClip.ActualHeight),
+            radius,
+            radius);
     }
 
     private void KeepTargetApplicationActive()

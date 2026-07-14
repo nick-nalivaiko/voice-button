@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Net.Http;
+using System.IO;
 using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
@@ -32,6 +33,11 @@ public partial class MainWindow : Window
     private readonly DiagnosticsLogService _diagnosticsLog = new();
 
     private CancellationTokenSource? _currentRun;
+    private readonly List<byte[]> _cachedAudioChunks = [];
+    private string? _cachedSpeechText;
+    private string? _cachedSpeechConfiguration;
+    private int _cachedSpeechChunkCount;
+    private bool _playbackStopped;
     private TrayIconService? _trayIconService;
     private FloatingButtonWindow? _floatingButtonWindow;
     private bool _exitRequested;
@@ -136,7 +142,7 @@ public partial class MainWindow : Window
     {
         _trayIconService = new TrayIconService(
             ShowFromTray,
-            () => _ = SpeakLatestAnswerAsync(),
+            () => _ = SpeakLatestOrResumeAsync(),
             StopCurrentRun,
             ExitApplication);
 
@@ -181,7 +187,7 @@ public partial class MainWindow : Window
 
     private void SpeakButton_Click(object sender, RoutedEventArgs e)
     {
-        _ = SpeakLatestAnswerAsync();
+        _ = SpeakLatestOrResumeAsync();
     }
 
     private void ClipboardButton_Click(object sender, RoutedEventArgs e)
@@ -376,13 +382,13 @@ public partial class MainWindow : Window
         switch (actionId)
         {
             case SpeakLatestHotkeyId:
-                _ = SpeakLatestAnswerAsync();
+                _ = SpeakLatestOrResumeAsync();
                 break;
             case ClipboardHotkeyId:
                 _ = SpeakClipboardAsync();
                 break;
             case CodexMicHotkeyId:
-                _ = StartActiveVoiceInputAsync();
+                _ = StartVoiceInputOrWhileStoppedAsync();
                 break;
         }
     }
@@ -894,6 +900,41 @@ public partial class MainWindow : Window
 
         return keywords.Length == 0 ? "Codex" : string.Join(", ", keywords);
     }
+    private async Task SpeakLatestOrResumeAsync()
+    {
+        if (_playbackStopped && _currentRun is not null)
+        {
+            _playbackStopped = false;
+            var resumedPlayback = _audioPlaybackService.Resume();
+            SetStatus(
+                resumedPlayback ? "Озвучиваю" : "Готовлю аудио",
+                resumedPlayback ? "Продолжаю с места остановки." : "Продолжаю текущую подготовку аудио.",
+                "#41D6A1",
+                busy: true);
+            return;
+        }
+
+        await SpeakLatestAnswerAsync();
+    }
+
+    private async Task StartVoiceInputOrWhileStoppedAsync()
+    {
+        if (!_playbackStopped || _currentRun is null)
+        {
+            await StartActiveVoiceInputAsync();
+            return;
+        }
+
+        try
+        {
+            var appName = await _codexMicrophoneService.StartVoiceInputAsync(SetCopyStatus, CancellationToken.None);
+            SetStatus($"Микрофон {appName}", "Голосовой ввод запущен. Остановленную озвучку можно продолжить.", "#41D6A1", busy: false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Ошибка", ex.Message, "#F25F5C", busy: false);
+        }
+    }
     private async Task StartActiveVoiceInputAsync()
     {
         if (!TryStartRun(out var cancellationToken))
@@ -929,7 +970,6 @@ public partial class MainWindow : Window
 
         try
         {
-            EnsureApiKeyReady();
             var text = await _codexCopyService.CopyLastAnswerAsync(SetCopyStatus, cancellationToken);
             await SpeakTextAsync(text, cancellationToken);
             SetReady();
@@ -957,7 +997,6 @@ public partial class MainWindow : Window
 
         try
         {
-            EnsureApiKeyReady();
             var text = _clipboardService.GetText();
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -1029,6 +1068,22 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("Нет текста для озвучки.");
         }
 
+        var speechConfiguration = $"{_settings.Model}|{_settings.Voice}|{_settings.Speed:F2}|{_settings.ResponseFormat}|{_settings.Instructions}";
+        if (string.Equals(_cachedSpeechText, speakableText, StringComparison.Ordinal)
+            && string.Equals(_cachedSpeechConfiguration, speechConfiguration, StringComparison.Ordinal)
+            && _cachedSpeechChunkCount == chunks.Count
+            && _cachedAudioChunks.Count == chunks.Count)
+        {
+            await ReplayCachedAudioAsync(cancellationToken);
+            return;
+        }
+
+        EnsureApiKeyReady();
+        _cachedSpeechText = speakableText;
+        _cachedSpeechConfiguration = speechConfiguration;
+        _cachedSpeechChunkCount = chunks.Count;
+        _cachedAudioChunks.Clear();
+
         for (var index = 0; index < chunks.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1037,13 +1092,31 @@ public partial class MainWindow : Window
                 chunks[index],
                 _settings,
                 cancellationToken);
+            using var capturedAudio = new CapturingReadStream(audio.AudioStream);
 
             cancellationToken.ThrowIfCancellationRequested();
             SetStatus("Озвучиваю", $"{index + 1}/{chunks.Count}", "#41D6A1", busy: true);
             await _audioPlaybackService.PlayStreamingAsync(
-                audio.AudioStream,
+                capturedAudio,
                 _settings.ResponseFormat,
-                cancellationToken);
+                cancellationToken,
+                startStopped: _playbackStopped);
+
+            _cachedAudioChunks.Add(capturedAudio.ToArray());
+        }
+    }
+    private async Task ReplayCachedAudioAsync(CancellationToken cancellationToken)
+    {
+        for (var index = 0; index < _cachedAudioChunks.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            SetStatus("Воспроизвожу сохраненное аудио", $"{index + 1}/{_cachedAudioChunks.Count}", "#41D6A1", busy: true);
+            using var audio = new MemoryStream(_cachedAudioChunks[index], writable: false);
+            await _audioPlaybackService.PlayStreamingAsync(
+                audio,
+                "mp3",
+                cancellationToken,
+                startStopped: _playbackStopped);
         }
     }
 
@@ -1067,13 +1140,30 @@ public partial class MainWindow : Window
     {
         _currentRun?.Dispose();
         _currentRun = null;
+        _playbackStopped = false;
         SetBusy(false);
     }
 
     private void StopCurrentRun()
     {
+        if (_currentRun is null)
+        {
+            _audioPlaybackService.StopAndCollapse();
+            _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
+            return;
+        }
+
+        _playbackStopped = true;
+        _audioPlaybackService.StopAndCollapse();
+        _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
+        SetStatus("Остановлено", "Аудио сохранено. Нажми озвучку, чтобы продолжить.", "#F9C74F", busy: false);
+    }
+
+    private void CancelCurrentRun()
+    {
+        _playbackStopped = false;
         _currentRun?.Cancel();
-        _audioPlaybackService.Stop();
+        _audioPlaybackService.Cancel();
     }
 
     private void EnsureApiKeyReady()
@@ -1226,8 +1316,8 @@ public partial class MainWindow : Window
         }
 
         _floatingButtonWindow = new FloatingButtonWindow(
-            () => _ = SpeakLatestAnswerAsync(),
-            () => _ = StartActiveVoiceInputAsync(),
+            () => _ = SpeakLatestOrResumeAsync(),
+            () => _ = StartVoiceInputOrWhileStoppedAsync(),
             _audioPlaybackService.TogglePause,
             _audioPlaybackService.Seek,
             StopCurrentRun,
@@ -1301,7 +1391,7 @@ public partial class MainWindow : Window
     private void ExitApplication()
     {
         _exitRequested = true;
-        StopCurrentRun();
+        CancelCurrentRun();
         _floatingButtonWindow?.Close();
         _floatingButtonWindow = null;
         Close();

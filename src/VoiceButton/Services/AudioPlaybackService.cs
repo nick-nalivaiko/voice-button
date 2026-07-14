@@ -36,14 +36,15 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
     public async Task PlayStreamingAsync(
         Stream audioStream,
         string responseFormat,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool startStopped = false)
     {
         if (!string.Equals(responseFormat, "mp3", StringComparison.OrdinalIgnoreCase))
         {
             throw new NotSupportedException("Потоковое воспроизведение сейчас поддерживает формат MP3.");
         }
 
-        var session = new StreamingPlaybackSession(PublishSnapshot, outputVolume);
+        var session = new StreamingPlaybackSession(PublishSnapshot, outputVolume, startStopped);
         lock (_gate)
         {
             if (_currentSession is not null)
@@ -95,7 +96,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
         session?.Seek(progress);
     }
 
-    public void Stop()
+    public bool StopAndCollapse()
     {
         StreamingPlaybackSession? session;
         lock (_gate)
@@ -103,7 +104,37 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
             session = _currentSession;
         }
 
-        session?.Stop();
+        if (session is null)
+        {
+            PublishSnapshot(PlaybackSnapshot.Inactive);
+            return false;
+        }
+
+        session.SoftStop();
+        return true;
+    }
+
+    public bool Resume()
+    {
+        StreamingPlaybackSession? session;
+        lock (_gate)
+        {
+            session = _currentSession;
+        }
+
+        return session?.Resume() == true;
+    }
+
+    public void Cancel()
+    {
+        StreamingPlaybackSession? session;
+        lock (_gate)
+        {
+            session = _currentSession;
+        }
+
+        session?.Cancel();
+        PublishSnapshot(PlaybackSnapshot.Inactive);
     }
 
     private void PublishSnapshot(PlaybackSnapshot snapshot)
@@ -128,7 +159,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
         }
     }
 
-    private sealed class StreamingPlaybackSession(Action<PlaybackSnapshot> publishSnapshot, float outputVolume) : IDisposable
+    private sealed class StreamingPlaybackSession(Action<PlaybackSnapshot> publishSnapshot, float outputVolume, bool startStopped) : IDisposable
     {
         private static readonly TimeSpan InitialBuffer = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan MinimumBuffer = TimeSpan.FromSeconds(4.5);
@@ -145,6 +176,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
         private bool _userPaused;
         private bool _buffering = true;
         private bool _playbackStopped;
+        private bool _transportStopped = startStopped;
         private bool _disposed;
 
         public async Task RunAsync(Stream audioStream, CancellationToken cancellationToken)
@@ -191,7 +223,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
             bool shouldPlay;
             lock (_gate)
             {
-                if (_provider is null || _disposed)
+                if (_provider is null || _transportStopped || _disposed)
                 {
                     return;
                 }
@@ -224,7 +256,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
             {
                 provider = _provider;
                 output = _output;
-                if (provider is null || _disposed)
+                if (provider is null || _transportStopped || _disposed)
                 {
                     return;
                 }
@@ -256,7 +288,73 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
             PublishCurrentSnapshot();
         }
 
-        public void Stop()
+        public void SoftStop()
+        {
+            WaveOutEvent? output;
+            lock (_gate)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _transportStopped = true;
+                _userPaused = false;
+                output = _output;
+            }
+
+            SafeStop(output);
+            publishSnapshot(PlaybackSnapshot.Inactive);
+        }
+
+        public bool Resume()
+        {
+            ProgressiveWaveProvider? provider;
+            WaveOutEvent? output;
+            bool shouldPlay;
+
+            lock (_gate)
+            {
+                if (_disposed)
+                {
+                    return false;
+                }
+
+                _transportStopped = false;
+                _userPaused = false;
+                provider = _provider;
+                output = _output;
+
+                if (provider is not null)
+                {
+                    var state = provider.GetState();
+                    if (state.IsComplete && !state.HasRemainingAudio)
+                    {
+                        provider.Seek(0);
+                    }
+
+                    shouldPlay = _started && CanResumeLocked();
+                    if (shouldPlay)
+                    {
+                        _playbackStopped = false;
+                    }
+                }
+                else
+                {
+                    shouldPlay = false;
+                }
+            }
+
+            if (shouldPlay)
+            {
+                SafePlay(output);
+            }
+
+            PublishCurrentSnapshot(forceActiveWithoutProvider: true);
+            return true;
+        }
+
+        public void Cancel()
         {
             CancellationTokenSource? cancellation;
             WaveOutEvent? output;
@@ -290,7 +388,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                 _disposed = true;
             }
 
-            Stop();
+            Cancel();
             StopAndDisposeOutput();
         }
 
@@ -431,9 +529,9 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                         _started = true;
                         _buffering = false;
                         _playbackStopped = false;
-                        startPlayback = !_userPaused;
+                        startPlayback = !_userPaused && !_transportStopped;
                     }
-                    else if (_started && !_userPaused)
+                    else if (_started && !_userPaused && !_transportStopped)
                     {
                         if (!state.IsComplete && !_buffering && state.BufferedDuration < MinimumBuffer)
                         {
@@ -453,7 +551,8 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                         }
                     }
 
-                    playbackComplete = _started
+                    playbackComplete = !_transportStopped
+                        && _started
                         && state.IsComplete
                         && !state.HasRemainingAudio
                         && _playbackStopped;
@@ -483,7 +582,6 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                 await Task.Delay(100, cancellationToken);
             }
         }
-
         private WaveOutEvent EnsureOutput(ProgressiveWaveProvider provider)
         {
             lock (_gate)
@@ -541,18 +639,31 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
             return state.HasRemainingAudio;
         }
 
-        private void PublishCurrentSnapshot()
+        private void PublishCurrentSnapshot(bool forceActiveWithoutProvider = false)
         {
             ProgressiveWaveProvider? provider;
             bool userPaused;
+            bool transportStopped;
             lock (_gate)
             {
                 provider = _provider;
                 userPaused = _userPaused;
+                transportStopped = _transportStopped;
+            }
+
+            if (transportStopped)
+            {
+                publishSnapshot(PlaybackSnapshot.Inactive);
+                return;
             }
 
             if (provider is null)
             {
+                if (forceActiveWithoutProvider)
+                {
+                    publishSnapshot(new PlaybackSnapshot(true, false, TimeSpan.Zero, TimeSpan.Zero));
+                }
+
                 return;
             }
 

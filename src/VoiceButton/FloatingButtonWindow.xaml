@@ -12,9 +12,11 @@
         Topmost="True"
         ShowActivated="False"
         Focusable="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         Loaded="Window_Loaded">
     <Border x:Name="ButtonShell"
-            CornerRadius="19"
+            CornerRadius="21"
             BorderBrush="#2B8DFF"
             BorderThickness="1.2"
             Cursor="Hand"
@@ -30,14 +32,8 @@
                 <GradientStop Color="#010711" Offset="1" />
             </LinearGradientBrush>
         </Border.Background>
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="18"
-                              ShadowDepth="0"
-                              Opacity="0.48"
-                              Color="#006DFF" />
-        </Border.Effect>
 
-        <Grid ClipToBounds="True">
+        <Grid x:Name="ContentClip" ClipToBounds="True" SizeChanged="ContentClip_SizeChanged">
             <Grid x:Name="CompactGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="43" />

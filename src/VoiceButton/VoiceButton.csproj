@@ -7,12 +7,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>..\..\Assets\AppIcon.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\Assets\TrayIcon.ico</ApplicationIcon>
     <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\Assets\TrayIcon.ico">
+      <Link>Assets\TrayIcon.ico</Link>
+    </Resource>
   </ItemGroup>
 
 </Project>

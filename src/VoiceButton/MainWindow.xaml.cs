@@ -154,6 +154,13 @@ public partial class MainWindow : Window
 
     private void SettingsScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (ModelComboBox.IsDropDownOpen
+            || VoiceComboBox.IsDropDownOpen
+            || InterfaceLanguageComboBox.IsDropDownOpen)
+        {
+            return;
+        }
+
         if (sender is not ScrollViewer scrollViewer)
         {
             return;
@@ -163,6 +170,20 @@ public partial class MainWindow : Window
         scrollViewer.ScrollToVerticalOffset(Math.Clamp(nextOffset, 0, scrollViewer.ScrollableHeight));
         e.Handled = true;
     }
+
+    private void ComboBoxPopup_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not ScrollViewer scrollViewer)
+        {
+            return;
+        }
+
+        var nextOffset = scrollViewer.VerticalOffset - (e.Delta * 0.08);
+        scrollViewer.ScrollToVerticalOffset(Math.Clamp(nextOffset, 0, scrollViewer.ScrollableHeight));
+
+        e.Handled = true;
+    }
+
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (_exitRequested)

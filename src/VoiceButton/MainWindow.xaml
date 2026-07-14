@@ -258,7 +258,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
-                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"><ContentPresenter.RenderTransform><TranslateTransform Y="-2" /></ContentPresenter.RenderTransform></ContentPresenter>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -300,7 +300,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ComboBoxItem}">
                         <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}">
-                            <TextBlock Text="{Binding Label}" Foreground="#F4F8FF" FontSize="15" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Label}" Foreground="#F4F8FF" FontSize="15" VerticalAlignment="Center"><TextBlock.RenderTransform><TranslateTransform Y="-2" /></TextBlock.RenderTransform></TextBlock>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
@@ -345,13 +345,13 @@
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
-                            <TextBlock Text="{Binding SelectedItem.Label, RelativeSource={RelativeSource TemplatedParent}}" Foreground="#F4F8FF" FontSize="16" VerticalAlignment="Center" Margin="16,0,44,0" TextTrimming="CharacterEllipsis" IsHitTestVisible="False" />
+                            <TextBlock Text="{Binding SelectedItem.Label, RelativeSource={RelativeSource TemplatedParent}}" Foreground="#F4F8FF" FontSize="16" VerticalAlignment="Center" Margin="16,0,44,0" TextTrimming="CharacterEllipsis" IsHitTestVisible="False"><TextBlock.RenderTransform><TranslateTransform Y="-2" /></TextBlock.RenderTransform></TextBlock>
                             <Path Data="M 0 0 L 5 5 L 10 0" Stroke="#94A9C3" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="10" Height="6" Stretch="None" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,18,0" IsHitTestVisible="False" />
                             <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
                                 <Grid Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="{TemplateBinding MaxDropDownHeight}" Margin="0,6,0,0">
                                     <Border Background="#061120" BorderBrush="#1E96FF" BorderThickness="1" CornerRadius="8" Padding="5">
                                         <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.32" Color="#006DFF" /></Border.Effect>
-                                        <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto"><ItemsPresenter /></ScrollViewer>
+                                        <ScrollViewer CanContentScroll="False" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly" PreviewMouseWheel="ComboBoxPopup_PreviewMouseWheel"><ItemsPresenter /></ScrollViewer>
                                     </Border>
                                 </Grid>
                             </Popup>

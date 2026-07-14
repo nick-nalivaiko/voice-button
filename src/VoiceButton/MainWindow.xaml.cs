@@ -993,14 +993,17 @@ public partial class MainWindow : Window
             EnsureApiKeyReady();
             var voiceLabel = GetSelectedVoiceLabel();
             SetStatus("Пробую голос", voiceLabel, "#37D0F4", busy: true);
-            var audio = await _speechClient.CreateSpeechAsync(
+            await using var audio = await _speechClient.CreateSpeechStreamAsync(
                 "Проверка голоса. Так будет звучать озвучка ответов Codex и ChatGPT.",
                 _settings,
                 cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
             SetStatus("Озвучиваю", voiceLabel, "#41D6A1", busy: true);
-            await _audioPlaybackService.PlayAsync(audio, _settings.ResponseFormat, cancellationToken);
+            await _audioPlaybackService.PlayStreamingAsync(
+                audio.AudioStream,
+                _settings.ResponseFormat,
+                cancellationToken);
             SetReady();
         }
         catch (OperationCanceledException)
@@ -1030,11 +1033,17 @@ public partial class MainWindow : Window
         {
             cancellationToken.ThrowIfCancellationRequested();
             SetStatus("Генерирую аудио", $"{index + 1}/{chunks.Count}", "#37D0F4", busy: true);
-            var audio = await _speechClient.CreateSpeechAsync(chunks[index], _settings, cancellationToken);
+            await using var audio = await _speechClient.CreateSpeechStreamAsync(
+                chunks[index],
+                _settings,
+                cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
             SetStatus("Озвучиваю", $"{index + 1}/{chunks.Count}", "#41D6A1", busy: true);
-            await _audioPlaybackService.PlayAsync(audio, _settings.ResponseFormat, cancellationToken);
+            await _audioPlaybackService.PlayStreamingAsync(
+                audio.AudioStream,
+                _settings.ResponseFormat,
+                cancellationToken);
         }
     }
 

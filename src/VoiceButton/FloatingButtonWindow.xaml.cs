@@ -15,7 +15,7 @@ public partial class FloatingButtonWindow : Window
     private const double ControlZoneWidth = 43;
     private const double DividerWidth = 1;
     private const double SeekZoneWidth = 186;
-    private const double PlayedWaveformWidth = 125;
+    private const double PlayedWaveformWidth = 135;
 
     private readonly Action _speak;
     private readonly Action _startVoiceInput;

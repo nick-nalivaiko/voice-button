@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -47,7 +48,10 @@ public sealed class OpenAiSpeechClient(HttpClient httpClient)
         return new ApiKeyValidationResult(false, $"OpenAI вернул {(int)response.StatusCode}: {TrimError(body)}");
     }
 
-    public async Task<byte[]> CreateSpeechAsync(string text, VoiceButtonSettings settings, CancellationToken cancellationToken)
+    public async Task<OpenAiSpeechStream> CreateSpeechStreamAsync(
+        string text,
+        VoiceButtonSettings settings,
+        CancellationToken cancellationToken)
     {
         var apiKey = GetApiKey()
             ?? throw new InvalidOperationException("OPENAI_API_KEY не задан. Вставь ключ в разделе Озвучка.");
@@ -60,16 +64,37 @@ public sealed class OpenAiSpeechClient(HttpClient httpClient)
             settings.Voice,
             SupportsInstructions(settings.Model) ? settings.Instructions : null,
             settings.ResponseFormat,
-            settings.Speed));
+            settings.Speed,
+            "audio"));
 
-        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"OpenAI TTS вернул {(int)response.StatusCode}: {TrimError(body)}");
+            try
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException($"OpenAI TTS вернул {(int)response.StatusCode}: {TrimError(body)}");
+            }
+            finally
+            {
+                response.Dispose();
+            }
         }
 
-        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        try
+        {
+            var audioStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            return new OpenAiSpeechStream(response, audioStream);
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
     }
 
     private static bool SupportsInstructions(string model)
@@ -95,7 +120,33 @@ public sealed class OpenAiSpeechClient(HttpClient httpClient)
         [property: JsonPropertyName("instructions")]
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Instructions,
         [property: JsonPropertyName("response_format")] string ResponseFormat,
-        [property: JsonPropertyName("speed")] double Speed);
+        [property: JsonPropertyName("speed")] double Speed,
+        [property: JsonPropertyName("stream_format")] string StreamFormat);
+}
+
+public sealed class OpenAiSpeechStream(HttpResponseMessage response, Stream audioStream) : IAsyncDisposable
+{
+    private HttpResponseMessage? _response = response;
+
+    public Stream AudioStream { get; } = audioStream;
+
+    public async ValueTask DisposeAsync()
+    {
+        var ownedResponse = Interlocked.Exchange(ref _response, null);
+        if (ownedResponse is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await AudioStream.DisposeAsync();
+        }
+        finally
+        {
+            ownedResponse.Dispose();
+        }
+    }
 }
 
 public sealed record ApiKeyValidationResult(bool IsValid, string Detail);

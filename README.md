@@ -13,6 +13,7 @@ Voice Button is a compact Windows companion for **Codex** and **ChatGPT**. It co
 - **Active-app aware**: works with the active Codex or ChatGPT window.
 - **Latest answer only**: targets assistant Copy actions instead of reading the user's prompt.
 - **OpenAI text-to-speech**: model, voice, and playback speed are configurable.
+- **Buffered streaming playback**: starts once ten seconds are buffered (or a shorter clip is complete) and protects a four-second reserve during network slowdowns.
 - **Floating controls**: microphone on the left, speech on the right, and an expanding player during playback.
 - **Real playback controls**: pause/resume, waveform seeking, elapsed time, and stop.
 - **Global hotkeys**: configurable shortcuts for the latest answer, clipboard speech, and application microphone.
@@ -25,7 +26,7 @@ Voice Button is a compact Windows companion for **Codex** and **ChatGPT**. It co
 
 ## Floating controls
 
-The compact control stays out of the way until playback starts. During speech it expands into a 274 px player with a 25-segment seekable waveform.
+The compact control stays out of the way until playback starts. During speech it expands into a 274 px player with a 27-segment seekable waveform.
 
 | Compact control | Playback control |
 | --- | --- |
@@ -118,7 +119,8 @@ For local development only, `.env.example` can be copied to `.env`; never commit
 3. The copied text is read from the clipboard and the previous clipboard value is restored when possible.
 4. Speech filters remove or shorten content that should not be spoken.
 5. Long text is split into safe chunks and sent to OpenAI TTS.
-6. Audio is played in order through the floating seekable player.
+6. Each MP3 response begins playing from a ten-second buffer, or as soon as a shorter clip is complete, while the remaining audio continues to arrive.
+7. Audio is played in order through the floating seekable player, with automatic rebuffering when needed.
 
 The primary path does not use screenshots or OCR.
 

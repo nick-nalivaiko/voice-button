@@ -1,6 +1,7 @@
+using System.Buffers;
 using System.IO;
-using System.Windows.Media;
 using System.Windows.Threading;
+using NAudio.Wave;
 
 namespace VoiceButton.Services;
 
@@ -13,10 +14,10 @@ public sealed record PlaybackSnapshot(bool IsActive, bool IsPaused, TimeSpan Pos
         : 0;
 }
 
-public sealed class AudioPlaybackService(Dispatcher dispatcher)
+public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolume = 1.0f)
 {
     private readonly object _gate = new();
-    private MediaPlayer? _currentPlayer;
+    private StreamingPlaybackSession? _currentSession;
     private PlaybackSnapshot _snapshot = PlaybackSnapshot.Inactive;
 
     public event EventHandler<PlaybackSnapshot>? PlaybackChanged;
@@ -32,203 +33,669 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher)
         }
     }
 
-    public async Task PlayAsync(byte[] audioBytes, string responseFormat, CancellationToken cancellationToken)
+    public async Task PlayStreamingAsync(
+        Stream audioStream,
+        string responseFormat,
+        CancellationToken cancellationToken)
     {
-        var directory = Path.Combine(Path.GetTempPath(), "VoiceButton");
-        Directory.CreateDirectory(directory);
+        if (!string.Equals(responseFormat, "mp3", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Потоковое воспроизведение сейчас поддерживает формат MP3.");
+        }
 
-        var extension = string.Equals(responseFormat, "wav", StringComparison.OrdinalIgnoreCase) ? "wav" : "mp3";
-        var path = Path.Combine(directory, $"{Guid.NewGuid():N}.{extension}");
-        await File.WriteAllBytesAsync(path, audioBytes, cancellationToken);
+        var session = new StreamingPlaybackSession(PublishSnapshot, outputVolume);
+        lock (_gate)
+        {
+            if (_currentSession is not null)
+            {
+                throw new InvalidOperationException("Другая озвучка уже воспроизводится.");
+            }
+
+            _currentSession = session;
+        }
 
         try
         {
-            await await dispatcher.InvokeAsync(() => PlayOnDispatcherAsync(path, cancellationToken));
+            await session.RunAsync(audioStream, cancellationToken);
         }
         finally
         {
-            TryDelete(path);
+            session.Dispose();
+            lock (_gate)
+            {
+                if (ReferenceEquals(_currentSession, session))
+                {
+                    _currentSession = null;
+                }
+            }
+
+            PublishSnapshot(PlaybackSnapshot.Inactive);
         }
     }
 
     public void TogglePause()
     {
-        RunOnDispatcher(() =>
+        StreamingPlaybackSession? session;
+        lock (_gate)
         {
-            MediaPlayer? player;
-            PlaybackSnapshot snapshot;
-            lock (_gate)
-            {
-                player = _currentPlayer;
-                snapshot = _snapshot;
-            }
+            session = _currentSession;
+        }
 
-            if (player is null || !snapshot.IsActive)
-            {
-                return;
-            }
-
-            if (snapshot.IsPaused)
-            {
-                player.Play();
-                SetSnapshot(snapshot with { IsPaused = false });
-            }
-            else
-            {
-                player.Pause();
-                SetSnapshot(snapshot with { IsPaused = true, Position = player.Position });
-            }
-        });
+        session?.TogglePause();
     }
 
     public void Seek(double progress)
     {
-        RunOnDispatcher(() =>
+        StreamingPlaybackSession? session;
+        lock (_gate)
         {
-            MediaPlayer? player;
-            PlaybackSnapshot snapshot;
-            lock (_gate)
-            {
-                player = _currentPlayer;
-                snapshot = _snapshot;
-            }
+            session = _currentSession;
+        }
 
-            if (player is null || !snapshot.IsActive || snapshot.Duration <= TimeSpan.Zero)
-            {
-                return;
-            }
-
-            var position = TimeSpan.FromTicks((long)(snapshot.Duration.Ticks * Math.Clamp(progress, 0, 1)));
-            player.Position = position;
-            SetSnapshot(snapshot with { Position = position });
-        });
+        session?.Seek(progress);
     }
 
     public void Stop()
     {
-        RunOnDispatcher(() =>
-        {
-            lock (_gate)
-            {
-                _currentPlayer?.Stop();
-            }
-        });
-    }
-
-    private async Task PlayOnDispatcherAsync(string path, CancellationToken cancellationToken)
-    {
-        var player = new MediaPlayer { Volume = 1.0 };
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
-        {
-            Interval = TimeSpan.FromMilliseconds(120)
-        };
-
-        void PublishPosition()
-        {
-            PlaybackSnapshot snapshot;
-            lock (_gate)
-            {
-                snapshot = _snapshot;
-            }
-
-            if (snapshot.IsActive)
-            {
-                SetSnapshot(snapshot with { Position = player.Position });
-            }
-        }
-
-        void Opened(object? _, EventArgs __)
-        {
-            var duration = player.NaturalDuration.HasTimeSpan
-                ? player.NaturalDuration.TimeSpan
-                : TimeSpan.Zero;
-
-            SetSnapshot(new PlaybackSnapshot(true, false, TimeSpan.Zero, duration));
-            timer.Start();
-            player.Play();
-        }
-
-        void Complete(object? _, EventArgs __)
-        {
-            completion.TrySetResult();
-        }
-
-        void Fail(object? _, ExceptionEventArgs args)
-        {
-            completion.TrySetException(args.ErrorException);
-        }
-
-        timer.Tick += (_, _) => PublishPosition();
-        player.MediaOpened += Opened;
-        player.MediaEnded += Complete;
-        player.MediaFailed += Fail;
-
+        StreamingPlaybackSession? session;
         lock (_gate)
         {
-            _currentPlayer = player;
+            session = _currentSession;
         }
 
-        using var registration = cancellationToken.Register(() =>
-        {
-            dispatcher.BeginInvoke(() =>
-            {
-                player.Stop();
-                completion.TrySetCanceled(cancellationToken);
-            });
-        });
-
-        try
-        {
-            player.Open(new Uri(path, UriKind.Absolute));
-            await completion.Task;
-        }
-        finally
-        {
-            timer.Stop();
-            player.Close();
-            lock (_gate)
-            {
-                if (ReferenceEquals(_currentPlayer, player))
-                {
-                    _currentPlayer = null;
-                }
-            }
-
-            SetSnapshot(PlaybackSnapshot.Inactive);
-        }
+        session?.Stop();
     }
 
-    private void SetSnapshot(PlaybackSnapshot snapshot)
+    private void PublishSnapshot(PlaybackSnapshot snapshot)
     {
         lock (_gate)
         {
             _snapshot = snapshot;
         }
 
-        PlaybackChanged?.Invoke(this, snapshot);
-    }
+        void RaiseChanged()
+        {
+            PlaybackChanged?.Invoke(this, snapshot);
+        }
 
-    private void RunOnDispatcher(Action action)
-    {
         if (dispatcher.CheckAccess())
         {
-            action();
-            return;
+            RaiseChanged();
         }
-
-        dispatcher.Invoke(action);
+        else if (!dispatcher.HasShutdownStarted)
+        {
+            _ = dispatcher.BeginInvoke(RaiseChanged, DispatcherPriority.Background);
+        }
     }
 
-    private static void TryDelete(string path)
+    private sealed class StreamingPlaybackSession(Action<PlaybackSnapshot> publishSnapshot, float outputVolume) : IDisposable
     {
-        try
+        private static readonly TimeSpan InitialBuffer = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan MinimumBuffer = TimeSpan.FromSeconds(4.5);
+        private static readonly TimeSpan ResumeBuffer = TimeSpan.FromSeconds(8);
+
+        private readonly object _gate = new();
+        private ProgressiveWaveProvider? _provider;
+        private WaveOutEvent? _output;
+        private CancellationTokenSource? _runCancellation;
+        private Exception? _decodeError;
+        private Exception? _playbackError;
+        private bool _downloadComplete;
+        private bool _started;
+        private bool _userPaused;
+        private bool _buffering = true;
+        private bool _playbackStopped;
+        private bool _disposed;
+
+        public async Task RunAsync(Stream audioStream, CancellationToken cancellationToken)
         {
-            File.Delete(path);
+            using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            lock (_gate)
+            {
+                _runCancellation = runCancellation;
+            }
+
+            using var streamCancellation = runCancellation.Token.Register(
+                static state => TryDisposeStream((Stream)state!),
+                audioStream);
+
+            var decodeTask = Task.Run(
+                () => DecodeMp3(audioStream, runCancellation.Token),
+                CancellationToken.None);
+            var monitorTask = MonitorPlaybackAsync(runCancellation.Token);
+
+            try
+            {
+                await Task.WhenAll(decodeTask, monitorTask);
+            }
+            catch
+            {
+                runCancellation.Cancel();
+                TryDisposeStream(audioStream);
+                throw;
+            }
+            finally
+            {
+                lock (_gate)
+                {
+                    _runCancellation = null;
+                }
+
+                StopAndDisposeOutput();
+            }
         }
-        catch
+
+        public void TogglePause()
         {
-            // Temporary audio cleanup is best-effort.
+            WaveOutEvent? output;
+            bool shouldPlay;
+            lock (_gate)
+            {
+                if (_provider is null || _disposed)
+                {
+                    return;
+                }
+
+                _userPaused = !_userPaused;
+                output = _output;
+                shouldPlay = !_userPaused && _started && CanResumeLocked();
+            }
+
+            if (_userPaused)
+            {
+                SafePause(output);
+            }
+            else if (shouldPlay)
+            {
+                SafePlay(output);
+            }
+
+            PublishCurrentSnapshot();
+        }
+
+        public void Seek(double progress)
+        {
+            ProgressiveWaveProvider? provider;
+            WaveOutEvent? output;
+            bool shouldPause;
+            bool shouldPlay;
+
+            lock (_gate)
+            {
+                provider = _provider;
+                output = _output;
+                if (provider is null || _disposed)
+                {
+                    return;
+                }
+
+                provider.Seek(progress);
+                var state = provider.GetState();
+                shouldPause = _started && !_userPaused && !state.IsComplete && state.BufferedDuration < MinimumBuffer;
+                if (shouldPause)
+                {
+                    _buffering = true;
+                }
+
+                shouldPlay = _started && !_userPaused && CanResumeLocked();
+                if (shouldPlay)
+                {
+                    _playbackStopped = false;
+                }
+            }
+
+            if (shouldPause)
+            {
+                SafePause(output);
+            }
+            else if (shouldPlay)
+            {
+                SafePlay(output);
+            }
+
+            PublishCurrentSnapshot();
+        }
+
+        public void Stop()
+        {
+            CancellationTokenSource? cancellation;
+            WaveOutEvent? output;
+            lock (_gate)
+            {
+                cancellation = _runCancellation;
+                output = _output;
+            }
+
+            try
+            {
+                cancellation?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The playback task has already completed.
+            }
+
+            SafeStop(output);
+        }
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+            }
+
+            Stop();
+            StopAndDisposeOutput();
+        }
+
+        private void DecodeMp3(Stream audioStream, CancellationToken cancellationToken)
+        {
+            IMp3FrameDecompressor? decompressor = null;
+            var decodeBuffer = ArrayPool<byte>.Shared.Rent(65536);
+            var frameStream = audioStream.CanSeek
+                ? audioStream
+                : new PositionTrackingReadStream(audioStream);
+
+            try
+            {
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    Mp3Frame? frame;
+                    try
+                    {
+                        frame = Mp3Frame.LoadFromStream(frameStream);
+                    }
+                    catch (EndOfStreamException)
+                    {
+                        break;
+                    }
+
+                    if (frame is null)
+                    {
+                        break;
+                    }
+
+                    if (decompressor is null)
+                    {
+                        var sourceFormat = new Mp3WaveFormat(
+                            frame.SampleRate,
+                            frame.ChannelMode == ChannelMode.Mono ? 1 : 2,
+                            frame.FrameLength,
+                            frame.BitRate);
+                        decompressor = new AcmMp3FrameDecompressor(sourceFormat);
+                        var provider = new ProgressiveWaveProvider(decompressor.OutputFormat);
+
+                        lock (_gate)
+                        {
+                            _provider = provider;
+                        }
+
+                        PublishCurrentSnapshot();
+                    }
+
+                    var decoded = decompressor.DecompressFrame(frame, decodeBuffer, 0);
+                    _provider!.Append(decodeBuffer, 0, decoded);
+                }
+
+                if (_provider is null)
+                {
+                    throw new InvalidDataException("OpenAI вернул пустой или неподдерживаемый MP3-поток.");
+                }
+            }
+            catch (Exception ex) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("Потоковая озвучка остановлена.", ex, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                lock (_gate)
+                {
+                    _decodeError = ex;
+                }
+
+                throw;
+            }
+            finally
+            {
+                decompressor?.Dispose();
+                ArrayPool<byte>.Shared.Return(decodeBuffer);
+
+                lock (_gate)
+                {
+                    _downloadComplete = true;
+                    _provider?.Complete();
+                }
+
+                PublishCurrentSnapshot();
+            }
+        }
+
+        private async Task MonitorPlaybackAsync(CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                ProgressiveWaveProvider? provider;
+                Exception? decodeError;
+                lock (_gate)
+                {
+                    provider = _provider;
+                    decodeError = _decodeError;
+                }
+
+                if (decodeError is not null)
+                {
+                    throw new InvalidOperationException("Не удалось декодировать поток OpenAI TTS.", decodeError);
+                }
+
+                if (provider is null)
+                {
+                    bool downloadComplete;
+                    lock (_gate)
+                    {
+                        downloadComplete = _downloadComplete;
+                    }
+
+                    if (downloadComplete)
+                    {
+                        throw new InvalidDataException("OpenAI не вернул аудиоданные для воспроизведения.");
+                    }
+
+                    await Task.Delay(50, cancellationToken);
+                    continue;
+                }
+
+                var output = EnsureOutput(provider);
+                var state = provider.GetState();
+                bool startPlayback = false;
+                bool pauseForBuffer = false;
+                bool resumePlayback = false;
+                bool playbackComplete;
+                Exception? playbackError;
+
+                lock (_gate)
+                {
+                    playbackError = _playbackError;
+
+                    if (!_started && (state.DownloadedDuration >= InitialBuffer || state.IsComplete))
+                    {
+                        _started = true;
+                        _buffering = false;
+                        _playbackStopped = false;
+                        startPlayback = !_userPaused;
+                    }
+                    else if (_started && !_userPaused)
+                    {
+                        if (!state.IsComplete && !_buffering && state.BufferedDuration < MinimumBuffer)
+                        {
+                            _buffering = true;
+                            pauseForBuffer = true;
+                        }
+                        else if (_buffering && (state.IsComplete || state.BufferedDuration >= ResumeBuffer))
+                        {
+                            _buffering = false;
+                            _playbackStopped = false;
+                            resumePlayback = true;
+                        }
+                        else if (!_buffering && state.HasRemainingAudio && output.PlaybackState == PlaybackState.Stopped)
+                        {
+                            _playbackStopped = false;
+                            resumePlayback = true;
+                        }
+                    }
+
+                    playbackComplete = _started
+                        && state.IsComplete
+                        && !state.HasRemainingAudio
+                        && _playbackStopped;
+                }
+
+                if (playbackError is not null)
+                {
+                    throw new InvalidOperationException("Аудиоустройство остановило воспроизведение.", playbackError);
+                }
+
+                if (pauseForBuffer)
+                {
+                    SafePause(output);
+                }
+                else if (startPlayback || resumePlayback)
+                {
+                    SafePlay(output);
+                }
+
+                PublishCurrentSnapshot();
+
+                if (playbackComplete)
+                {
+                    return;
+                }
+
+                await Task.Delay(100, cancellationToken);
+            }
+        }
+
+        private WaveOutEvent EnsureOutput(ProgressiveWaveProvider provider)
+        {
+            lock (_gate)
+            {
+                if (_output is not null)
+                {
+                    return _output;
+                }
+
+                var output = new WaveOutEvent
+                {
+                    DesiredLatency = 120,
+                    NumberOfBuffers = 3,
+                    Volume = Math.Clamp(outputVolume, 0f, 1f)
+                };
+                output.PlaybackStopped += Output_PlaybackStopped;
+                output.Init(provider);
+                _output = output;
+                return output;
+            }
+        }
+
+        private void Output_PlaybackStopped(object? sender, StoppedEventArgs e)
+        {
+            lock (_gate)
+            {
+                _playbackStopped = true;
+                if (e.Exception is not null)
+                {
+                    _playbackError = e.Exception;
+                }
+            }
+        }
+
+        private bool CanResumeLocked()
+        {
+            if (_provider is null)
+            {
+                return false;
+            }
+
+            var state = _provider.GetState();
+            if (state.IsComplete)
+            {
+                _buffering = false;
+                return state.HasRemainingAudio;
+            }
+
+            if (_buffering && state.BufferedDuration < ResumeBuffer)
+            {
+                return false;
+            }
+
+            _buffering = false;
+            return state.HasRemainingAudio;
+        }
+
+        private void PublishCurrentSnapshot()
+        {
+            ProgressiveWaveProvider? provider;
+            bool userPaused;
+            lock (_gate)
+            {
+                provider = _provider;
+                userPaused = _userPaused;
+            }
+
+            if (provider is null)
+            {
+                return;
+            }
+
+            var state = provider.GetState();
+            publishSnapshot(new PlaybackSnapshot(
+                true,
+                userPaused,
+                state.Position,
+                state.DownloadedDuration));
+        }
+
+        private void StopAndDisposeOutput()
+        {
+            WaveOutEvent? output;
+            lock (_gate)
+            {
+                output = _output;
+                _output = null;
+            }
+
+            if (output is null)
+            {
+                return;
+            }
+
+            output.PlaybackStopped -= Output_PlaybackStopped;
+            SafeStop(output);
+            output.Dispose();
+        }
+
+        private static void SafePlay(WaveOutEvent? output)
+        {
+            try
+            {
+                output?.Play();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Playback is already shutting down.
+            }
+        }
+
+        private static void SafePause(WaveOutEvent? output)
+        {
+            try
+            {
+                output?.Pause();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Playback is already shutting down.
+            }
+        }
+
+        private static void SafeStop(WaveOutEvent? output)
+        {
+            try
+            {
+                output?.Stop();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Playback is already shutting down.
+            }
+        }
+
+        private sealed class PositionTrackingReadStream(Stream inner) : Stream
+        {
+            private long _position;
+
+            public override bool CanRead => inner.CanRead;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position
+            {
+                get => Interlocked.Read(ref _position);
+                set => throw new NotSupportedException();
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                var totalRead = 0;
+                while (totalRead < count)
+                {
+                    var read = inner.Read(buffer, offset + totalRead, count - totalRead);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+
+                    totalRead += read;
+                }
+
+                Interlocked.Add(ref _position, totalRead);
+                return totalRead;
+            }
+
+            public override int Read(Span<byte> buffer)
+            {
+                var totalRead = 0;
+                while (totalRead < buffer.Length)
+                {
+                    var read = inner.Read(buffer[totalRead..]);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+
+                    totalRead += read;
+                }
+
+                Interlocked.Add(ref _position, totalRead);
+                return totalRead;
+            }
+
+            public override int ReadByte()
+            {
+                var value = inner.ReadByte();
+                if (value >= 0)
+                {
+                    Interlocked.Increment(ref _position);
+                }
+
+                return value;
+            }
+
+            public override void Flush() => throw new NotSupportedException();
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        }
+
+        private static void TryDisposeStream(Stream stream)
+        {
+            try
+            {
+                stream.Dispose();
+            }
+            catch
+            {
+                // Disposing is only used to unblock a canceled network read.
+            }
         }
     }
 }

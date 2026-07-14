@@ -1,0 +1,29 @@
+# .NET and IDE output
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+*.log
+
+# Local secrets
+.env
+.env.local
+
+# Build and release output
+publish/
+artifacts/
+Voice Button - PORTABLE RELEASE/
+
+# Local launchers and archived runtimes
+*.lnk
+.dotnet/
+.dotnet.zip
+
+# Local agent and design working files
+.agents/
+.codex/
+audit-screens/
+user docs/
+design-qa.md

@@ -1,0 +1,932 @@
+<Window x:Class="VoiceButton.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Voice Button"
+        Width="1120"
+        Height="840"
+        MinWidth="980"
+        MinHeight="760"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <Window.Resources>
+        <SolidColorBrush x:Key="TextPrimary" Color="#F4F8FF" />
+        <SolidColorBrush x:Key="TextSecondary" Color="#A6B4C8" />
+        <SolidColorBrush x:Key="AccentBlue" Color="#1E96FF" />
+        <SolidColorBrush x:Key="LineBrush" Color="#21354C" />
+
+
+        <Style x:Key="InvisibleScrollRepeatButton" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="MinWidth" Value="10" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.74" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid x:Name="Root" Width="10" Background="Transparent" SnapsToDevicePixels="True">
+                            <Border x:Name="TrackBackground"
+                                    Width="3"
+                                    Margin="2,6"
+                                    HorizontalAlignment="Center"
+                                    Background="#13233A"
+                                    CornerRadius="2"
+                                    Opacity="0.22" />
+                            <Track x:Name="PART_Track" IsDirectionReversed="True" ViewportSize="NaN">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.LineUpCommand" Style="{StaticResource InvisibleScrollRepeatButton}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb x:Name="Thumb" Height="56" MinHeight="56" Background="#1E96FF" Opacity="0.34">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="{x:Type Thumb}">
+                                                <Border Background="{TemplateBinding Background}"
+                                                        CornerRadius="4"
+                                                        Margin="2,6" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.LineDownCommand" Style="{StaticResource InvisibleScrollRepeatButton}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter TargetName="Root" Property="Width" Value="Auto" />
+                                <Setter TargetName="Root" Property="Height" Value="10" />
+                                <Setter TargetName="TrackBackground" Property="Width" Value="Auto" />
+                                <Setter TargetName="TrackBackground" Property="Height" Value="3" />
+                                <Setter TargetName="TrackBackground" Property="Margin" Value="6,2" />
+                            </Trigger>
+                            <Trigger SourceName="Thumb" Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Thumb" Property="Background" Value="#37D0F4" />
+                                <Setter TargetName="Thumb" Property="Opacity" Value="0.62" />
+                                <Setter TargetName="TrackBackground" Property="Opacity" Value="0.34" />
+                            </Trigger>
+                            <Trigger SourceName="Thumb" Property="IsDragging" Value="True">
+                                <Setter TargetName="Thumb" Property="Background" Value="#37D0F4" />
+                                <Setter TargetName="Thumb" Property="Opacity" Value="0.78" />
+                                <Setter TargetName="TrackBackground" Property="Opacity" Value="0.42" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="WindowButton" TargetType="Button">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Foreground" Value="#CEDAEB" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#102640" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#235A88" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#15345B" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarIcon" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="Foreground" Value="#9EB4D0" />
+            <Setter Property="Width" Value="34" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="SidebarText" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="LineHeight" Value="24" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="-3" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarButton" TargetType="Button">
+            <Setter Property="Height" Value="58" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="18,0" />
+            <Setter Property="Foreground" Value="#B8C4D6" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#0A1A2F" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1D4770" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SelectedSidebarButton" BasedOn="{StaticResource SidebarButton}" TargetType="Button">
+            <Setter Property="Foreground" Value="#F4F8FF" />
+            <Setter Property="Background" Value="#0D2038" />
+            <Setter Property="BorderBrush" Value="#1E96FF" />
+            <Setter Property="BorderThickness" Value="1.2" />
+        </Style>
+
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#1E96FF" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="PageTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#F4F8FF" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="PageHint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#8FA0B7" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#D7E0EF" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="FieldHint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#7F8FA6" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="RowIcon" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="21" />
+            <Setter Property="Foreground" Value="#AFC0D7" />
+            <Setter Property="Width" Value="32" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="FieldShell" TargetType="Border">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Background" Value="#071525" />
+            <Setter Property="BorderBrush" Value="#263A52" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Padding" Value="16,0" />
+        </Style>
+
+        <Style x:Key="InfoCard" TargetType="Border">
+            <Setter Property="Background" Value="#071525" />
+            <Setter Property="BorderBrush" Value="#263A52" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="18" />
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="MinWidth" Value="112" />
+            <Setter Property="Foreground" Value="#E8F1FF" />
+            <Setter Property="Background" Value="#071525" />
+            <Setter Property="BorderBrush" Value="#315170" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="18,0" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#0B2138" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1E96FF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#102C4B" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButton" BasedOn="{StaticResource SecondaryButton}" TargetType="Button">
+            <Setter Property="MinWidth" Value="186" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="BorderBrush" Value="#1E96FF" />
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#1D7FFF" Offset="0" />
+                        <GradientStop Color="#123B72" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBoxItem" TargetType="{x:Type ComboBoxItem}">
+            <Setter Property="Foreground" Value="#F4F8FF" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+                        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}">
+                            <TextBlock Text="{Binding Label}" Foreground="#F4F8FF" FontSize="15" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#0E2C4D" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#123C6D" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBox" TargetType="{x:Type ComboBox}">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Foreground" Value="#F4F8FF" />
+            <Setter Property="Background" Value="#071525" />
+            <Setter Property="BorderBrush" Value="#263A52" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="MaxDropDownHeight" Value="230" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid SnapsToDevicePixels="True">
+                            <ToggleButton x:Name="ToggleButton" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Focusable="False" ClickMode="Press" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7" />
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1E96FF" />
+                                                <Setter TargetName="Chrome" Property="Background" Value="#0A1A2F" />
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#37D0F4" />
+                                                <Setter TargetName="Chrome" Property="Background" Value="#0B203A" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <TextBlock Text="{Binding SelectedItem.Label, RelativeSource={RelativeSource TemplatedParent}}" Foreground="#F4F8FF" FontSize="16" VerticalAlignment="Center" Margin="16,0,44,0" TextTrimming="CharacterEllipsis" IsHitTestVisible="False" />
+                            <Path Data="M 0 0 L 5 5 L 10 0" Stroke="#94A9C3" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="10" Height="6" Stretch="None" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,18,0" IsHitTestVisible="False" />
+                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+                                <Grid Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="{TemplateBinding MaxDropDownHeight}" Margin="0,6,0,0">
+                                    <Border Background="#061120" BorderBrush="#1E96FF" BorderThickness="1" CornerRadius="8" Padding="5">
+                                        <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.32" Color="#006DFF" /></Border.Effect>
+                                        <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto"><ItemsPresenter /></ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NeonToggle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="54" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Track" Background="#111E30" BorderBrush="#40516A" BorderThickness="1" CornerRadius="14" Padding="3">
+                            <Ellipse x:Name="Thumb" Width="20" Height="20" Fill="#9DA9B8" HorizontalAlignment="Left" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="#0B3764" />
+                                <Setter TargetName="Track" Property="BorderBrush" Value="#1E96FF" />
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Thumb" Property="Fill" Value="#66C8FF" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Track" Property="BorderBrush" Value="#37D0F4" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PreviewIconButton" TargetType="Button">
+            <Setter Property="Width" Value="70" />
+            <Setter Property="Height" Value="70" />
+            <Setter Property="Background" Value="#0B3764" />
+            <Setter Property="BorderBrush" Value="#1E96FF" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="ToolTip" Value="Прослушать голос" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="35">
+                            <Border.Effect><DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.34" Color="#007AFF" /></Border.Effect>
+                            <Path Fill="#DFF3FF" Data="M 0 0 L 0 22 L 19 11 Z" Width="22" Height="24" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="5,0,0,0" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#37D0F4" /><Setter TargetName="Chrome" Property="Background" Value="#0E477E" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#145C9D" /></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Opacity" Value="0.55" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkPasswordBox" TargetType="{x:Type PasswordBox}">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Foreground" Value="#F4F8FF" />
+            <Setter Property="Background" Value="#071525" />
+            <Setter Property="BorderBrush" Value="#263A52" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CaretBrush" Value="#37D0F4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type PasswordBox}">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="10,0" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1E96FF" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#0A1A2F" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#315170" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>        </Style>
+
+        <Style x:Key="DarkTextBox" TargetType="{x:Type TextBox}">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Foreground" Value="#F4F8FF" />
+            <Setter Property="Background" Value="#071525" />
+            <Setter Property="BorderBrush" Value="#263A52" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CaretBrush" Value="#37D0F4" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TextBox}">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="10,0" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1E96FF" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#0A1A2F" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#315170" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="NeonSlider" TargetType="{x:Type Slider}">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid Height="24" SnapsToDevicePixels="True">
+                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" Background="#1E96FF" CornerRadius="2" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" Background="#13233A" CornerRadius="2" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="16" Height="16">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="#102E55" Stroke="#37D0F4" StrokeThickness="2" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SlimProgress" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Background" Value="#12243A" />
+            <Setter Property="Foreground" Value="#1E96FF" />
+        </Style>
+    </Window.Resources>
+
+    <Border CornerRadius="22" BorderBrush="#2B8DFF" BorderThickness="1.2">
+        <Border.Background>
+            <RadialGradientBrush GradientOrigin="0.42,0.1" Center="0.45,0.1" RadiusX="0.9" RadiusY="0.9">
+                <GradientStop Color="#0B1B31" Offset="0" />
+                <GradientStop Color="#06101D" Offset="0.45" />
+                <GradientStop Color="#010711" Offset="1" />
+            </RadialGradientBrush>
+        </Border.Background>
+        <Border.Effect><DropShadowEffect BlurRadius="36" ShadowDepth="0" Opacity="0.42" Color="#001A3A" /></Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="84" /><RowDefinition Height="*" /><RowDefinition Height="76" /></Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="34,0">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="HeaderTitle" Text="Настройки Voice Button" Foreground="{StaticResource TextPrimary}" FontSize="29" FontWeight="Bold" />
+                    <Border Background="#071525" BorderBrush="#243D5A" BorderThickness="1" CornerRadius="14" Padding="10,5" Margin="22,2,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="StatusLight" Width="8" Height="8" Fill="#41D6A1" VerticalAlignment="Center" Margin="0,0,7,0" />
+                            <TextBlock x:Name="StatusText" Text="Готово" Foreground="#D8E7FA" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource WindowButton}" Content="&#xE921;" Margin="0,0,12,0" Click="MinimizeButton_Click" />
+                    <Button Style="{StaticResource WindowButton}" Content="&#xE922;" Margin="0,0,12,0" Click="MaximizeButton_Click" />
+                    <Button Style="{StaticResource WindowButton}" Content="&#xE8BB;" Click="CloseButton_Click" />
+                </StackPanel>
+            </Grid>
+            <Border Grid.Row="0" Grid.RowSpan="3" Height="1" VerticalAlignment="Top" Margin="0,84,0,0" Background="#1B2B40" />
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="282" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" BorderBrush="#23364E" BorderThickness="0,0,1,0">
+                    <Grid Margin="20,24,20,24">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0">
+                            <Button x:Name="GeneralNavButton" Tag="General" Style="{StaticResource SelectedSidebarButton}" Click="SidebarButton_Click">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock x:Name="GeneralNavIcon" Style="{StaticResource SidebarIcon}" Text="&#xE713;" Foreground="#24A3FF" /><TextBlock x:Name="GeneralNavText" Grid.Column="1" Style="{StaticResource SidebarText}" Text="Общие" FontWeight="SemiBold" /></Grid>
+                            </Button>
+                            <Button x:Name="SpeechNavButton" Tag="Speech" Style="{StaticResource SidebarButton}" Margin="0,12,0,0" Click="SidebarButton_Click">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock x:Name="SpeechNavIcon" Style="{StaticResource SidebarIcon}" Text="&#xE995;" /><TextBlock x:Name="SpeechNavText" Grid.Column="1" Style="{StaticResource SidebarText}" Text="Озвучка" /></Grid>
+                            </Button>
+                            <Button x:Name="HotkeysNavButton" Tag="Hotkeys" Style="{StaticResource SidebarButton}" Margin="0,12,0,0" Click="SidebarButton_Click">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock x:Name="HotkeysNavIcon" Style="{StaticResource SidebarIcon}" Text="&#xE765;" /><TextBlock x:Name="HotkeysNavText" Grid.Column="1" Style="{StaticResource SidebarText}" Text="Горячие клавиши" /></Grid>
+                            </Button>
+                            <Button x:Name="IntegrationNavButton" Tag="Integration" Style="{StaticResource SidebarButton}" Margin="0,12,0,0" Click="SidebarButton_Click">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock x:Name="IntegrationNavIcon" Style="{StaticResource SidebarIcon}" Text="&#xECAA;" /><TextBlock x:Name="IntegrationNavText" Grid.Column="1" Style="{StaticResource SidebarText}" Text="Интеграция" /></Grid>
+                            </Button>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2">
+                            <Border Height="1" Background="#1F3147" Margin="0,0,0,22" />
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#9DB0CA" VerticalAlignment="Top" TextAlignment="Center" /><StackPanel Grid.Column="1" Margin="10,0,0,0"><TextBlock x:Name="DetailText" Text="Ctrl+Alt+V озвучит последний ответ." Foreground="#B7C4D6" FontSize="12.5" TextWrapping="Wrap" /><TextBlock x:Name="AccentHintText" Text="Автосохранение включено." Foreground="#1E96FF" FontSize="12.5" Margin="0,5,0,0" TextWrapping="Wrap" LineHeight="18" /><ProgressBar x:Name="ProgressBar" Style="{StaticResource SlimProgress}" IsIndeterminate="False" Visibility="Hidden" Margin="0,14,0,0" /></StackPanel></Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <ScrollViewer x:Name="SettingsScrollViewer" Grid.Column="1" Margin="36,26,40,22" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" PreviewMouseWheel="SettingsScrollViewer_PreviewMouseWheel"><Grid>
+                    <Grid x:Name="GeneralPage">
+                        <StackPanel MaxWidth="760" HorizontalAlignment="Stretch">
+                            <TextBlock x:Name="GeneralPageTitleText" Style="{StaticResource PageTitle}" Text="Общие" />
+                            <TextBlock x:Name="GeneralPageHintText" Style="{StaticResource PageHint}" Text="Поведение окна, плавающая кнопка и запуск приложения." Margin="0,6,0,24" />
+
+                            <TextBlock x:Name="GeneralSectionTitleText" Style="{StaticResource SectionTitle}" Text="Поведение" Margin="0,0,0,12" />
+
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE774;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="InterfaceLanguageLabelText" Style="{StaticResource FieldLabel}" Text="Язык интерфейса" />
+                                    <TextBlock x:Name="InterfaceLanguageHintText" Style="{StaticResource FieldHint}" Text="Переводит основные элементы окна настроек." />
+                                </StackPanel>
+                                <ComboBox x:Name="InterfaceLanguageComboBox" Grid.Column="2" Width="300" HorizontalAlignment="Right" Margin="24,0,0,0" Style="{StaticResource DarkComboBox}" SelectionChanged="InterfaceLanguageComboBox_SelectionChanged" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE7C4;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="FloatingButtonLabelText" Style="{StaticResource FieldLabel}" Text="Показывать плавающую кнопку" />
+                                    <TextBlock x:Name="FloatingButtonHintText" Style="{StaticResource FieldHint}" Text="Маленькая кнопка над часами: микрофон слева, озвучка справа." />
+                                </StackPanel>
+                                <ToggleButton x:Name="FloatingButtonToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="FloatingButtonToggle_Changed" Unchecked="FloatingButtonToggle_Changed" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE921;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="MinimizeToTrayLabelText" Style="{StaticResource FieldLabel}" Text="Сворачивать в трей" />
+                                    <TextBlock x:Name="MinimizeToTrayHintText" Style="{StaticResource FieldHint}" Text="Крестик и кнопка свернуть прячут окно, приложение остается под рукой." />
+                                </StackPanel>
+                                <ToggleButton x:Name="MinimizeToTrayToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="MinimizeToTrayToggle_Changed" Unchecked="MinimizeToTrayToggle_Changed" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE782;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="StartWithWindowsLabelText" Style="{StaticResource FieldLabel}" Text="Запускать вместе с Windows" />
+                                    <TextBlock x:Name="StartWithWindowsHintText" Style="{StaticResource FieldHint}" Text="Добавляет Voice Button в автозапуск текущего пользователя Windows." />
+                                </StackPanel>
+                                <ToggleButton x:Name="StartWithWindowsToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="StartWithWindowsToggle_Changed" Unchecked="StartWithWindowsToggle_Changed" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE81C;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="RememberFloatingPositionLabelText" Style="{StaticResource FieldLabel}" Text="Запоминать позицию кнопки" />
+                                    <TextBlock x:Name="RememberFloatingPositionHintText" Style="{StaticResource FieldHint}" Text="Если выключить, кнопка каждый запуск возвращается в правый нижний угол." />
+                                </StackPanel>
+                                <ToggleButton x:Name="RememberFloatingButtonPositionToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="RememberFloatingButtonPositionToggle_Changed" Unchecked="RememberFloatingButtonPositionToggle_Changed" />
+                            </Grid>
+
+                            <Button x:Name="ResetFloatingPositionButton" Style="{StaticResource SecondaryButton}" Content="Сбросить позицию кнопки" HorizontalAlignment="Left" Margin="36,2,0,0" Click="ResetFloatingButtonPosition_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid x:Name="SpeechPage" Visibility="Collapsed">
+                        <StackPanel MaxWidth="760" HorizontalAlignment="Stretch">
+                            <TextBlock x:Name="SpeechPageTitleText" Style="{StaticResource PageTitle}" Text="Озвучка" />
+                            <TextBlock x:Name="SpeechPageHintText" Style="{StaticResource PageHint}" Text="OpenAI, модель, голос и подготовка текста перед озвучкой." Margin="0,6,0,24" />
+
+                            <TextBlock x:Name="OpenAiSectionTitleText" Style="{StaticResource SectionTitle}" Text="OpenAI" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE753;" />
+                                <TextBlock x:Name="ProviderLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="Поставщик" />
+                                <Border Grid.Column="2" Style="{StaticResource FieldShell}"><TextBlock Text="OpenAI" Foreground="{StaticResource TextPrimary}" FontSize="16" VerticalAlignment="Center" /></Border>
+                            </Grid>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /><ColumnDefinition Width="128" /><ColumnDefinition Width="128" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D7;" />
+                                <TextBlock x:Name="ApiKeyLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="OpenAI API key" />
+                                <PasswordBox x:Name="OpenAiApiKeyBox" Grid.Column="2" Style="{StaticResource DarkPasswordBox}" Margin="0,0,12,0" />
+                                <Button x:Name="SaveApiKeyButton" Grid.Column="3" Style="{StaticResource SecondaryButton}" Content="Сохранить" Margin="0,0,12,0" Click="SaveApiKeyButton_Click" />
+                                <Button x:Name="CheckApiKeyButton" Grid.Column="4" Style="{StaticResource SecondaryButton}" Content="Проверить" Click="CheckApiKeyButton_Click" />
+                            </Grid>
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE73E;" />
+                                <TextBlock x:Name="ApiKeyStatusLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="Статус ключа" />
+                                <Border x:Name="ApiKeyBadge" Grid.Column="2" Style="{StaticResource FieldShell}">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Ellipse x:Name="ApiKeyDot" Width="8" Height="8" Fill="#41D6A1" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                        <TextBlock x:Name="ApiKeyStateText" Text="Ключ подключен" Foreground="#8AF2D2" FontSize="15" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <TextBlock x:Name="VoiceSectionTitleText" Style="{StaticResource SectionTitle}" Text="Голос" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8B8;" />
+                                <TextBlock x:Name="ModelLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="Модель голоса" />
+                                <ComboBox x:Name="ModelComboBox" Grid.Column="2" Style="{StaticResource DarkComboBox}" SelectionChanged="ModelComboBox_SelectionChanged" />
+                            </Grid>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE77B;" />
+                                <TextBlock x:Name="VoiceLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="Голос" />
+                                <ComboBox x:Name="VoiceComboBox" Grid.Column="2" Style="{StaticResource DarkComboBox}" SelectionChanged="VoiceComboBox_SelectionChanged" />
+                            </Grid>
+                                                        <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /><ColumnDefinition Width="78" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE916;" />
+                                <TextBlock x:Name="SpeedLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="Скорость" />
+                                <Slider x:Name="SpeedSlider" Grid.Column="2" Style="{StaticResource NeonSlider}" Minimum="0.25" Maximum="4" TickFrequency="0.05" IsSnapToTickEnabled="True" ValueChanged="SpeedSlider_ValueChanged" />
+                                <TextBlock x:Name="SpeedValueText" Grid.Column="3" Text="1.00x" Foreground="#B9C5D6" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE768;" />
+                                <TextBlock x:Name="PreviewVoiceLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="Тест озвучки" />
+                                <Button x:Name="PreviewVoiceButton" Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Тест озвучки" HorizontalAlignment="Left" Click="PreviewVoiceButton_Click" />
+                            </Grid>
+
+                            <TextBlock x:Name="TextPreparationSectionTitleText" Style="{StaticResource SectionTitle}" Text="Подготовка текста" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D2;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="HidePathsLabelText" Style="{StaticResource FieldLabel}" Text="Скрывать пути к файлам" />
+                                    <TextBlock x:Name="HidePathsHintText" Style="{StaticResource FieldHint}" Text="В аудио остается имя файла, без полного пути." />
+                                </StackPanel>
+                                <ToggleButton x:Name="HidePathsToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE943;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="HideCodeBlocksLabelText" Style="{StaticResource FieldLabel}" Text="Скрывать блоки кода" />
+                                    <TextBlock x:Name="HideCodeBlocksHintText" Style="{StaticResource FieldHint}" Text="Многострочные и отступленные блоки кода заменяются короткой пометкой." />
+                                </StackPanel>
+                                <ToggleButton x:Name="HideCodeBlocksToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D2;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="HideInlineCodeLabelText" Style="{StaticResource FieldLabel}" Text="Скрывать inline-code" />
+                                    <TextBlock x:Name="HideInlineCodeHintText" Style="{StaticResource FieldHint}" Text="Короткий текст в обратных кавычках заменяется пометкой." />
+                                </StackPanel>
+                                <ToggleButton x:Name="HideInlineCodeToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE774;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="ShortenLinksLabelText" Style="{StaticResource FieldLabel}" Text="Сокращать ссылки" />
+                                    <TextBlock x:Name="ShortenLinksHintText" Style="{StaticResource FieldHint}" Text="Остается домен и последний понятный фрагмент URL." />
+                                </StackPanel>
+                                <ToggleButton x:Name="ShortenLinksToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE72E;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="HideSecretsLabelText" Style="{StaticResource FieldLabel}" Text="Скрывать секреты и токены" />
+                                    <TextBlock x:Name="HideSecretsHintText" Style="{StaticResource FieldHint}" Text="API keys, bearer-токены, JWT и пароли не уходят в озвучку." />
+                                </StackPanel>
+                                <ToggleButton x:Name="HideSecretsToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8EF;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="ShortenHashesLabelText" Style="{StaticResource FieldLabel}" Text="Сокращать hash, UUID и commit id" />
+                                    <TextBlock x:Name="ShortenHashesHintText" Style="{StaticResource FieldHint}" Text="Длинные идентификаторы читаются только по первым символам." />
+                                </StackPanel>
+                                <ToggleButton x:Name="ShortenHashesToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE9D9;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="CollapseStackTracesLabelText" Style="{StaticResource FieldLabel}" Text="Сжимать логи и stack trace" />
+                                    <TextBlock x:Name="CollapseStackTracesHintText" Style="{StaticResource FieldHint}" Text="Повторяющиеся строки логов заменяются одной пометкой." />
+                                </StackPanel>
+                                <ToggleButton x:Name="CollapseStackTracesToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8A5;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="RemoveMarkdownNoiseLabelText" Style="{StaticResource FieldLabel}" Text="Убирать markdown-шум" />
+                                    <TextBlock x:Name="RemoveMarkdownNoiseHintText" Style="{StaticResource FieldHint}" Text="Символы разметки не будут зачитываться как отдельный текст." />
+                                </StackPanel>
+                                <ToggleButton x:Name="RemoveMarkdownNoiseToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE80A;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="CollapseTablesLabelText" Style="{StaticResource FieldLabel}" Text="Сжимать таблицы" />
+                                    <TextBlock x:Name="CollapseTablesHintText" Style="{StaticResource FieldHint}" Text="Markdown-таблица заменяется короткой пометкой." />
+                                </StackPanel>
+                                <ToggleButton x:Name="CollapseTablesToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8B7;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="CollapseStructuredDataLabelText" Style="{StaticResource FieldLabel}" Text="Сжимать JSON и YAML" />
+                                    <TextBlock x:Name="CollapseStructuredDataHintText" Style="{StaticResource FieldHint}" Text="Конфиги и структурированные блоки не читаются построчно." />
+                                </StackPanel>
+                                <ToggleButton x:Name="CollapseStructuredDataToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE756;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="ShortenShellCommandsLabelText" Style="{StaticResource FieldLabel}" Text="Скрывать команды" />
+                                    <TextBlock x:Name="ShortenShellCommandsHintText" Style="{StaticResource FieldHint}" Text="Длинные shell-команды заменяются короткой пометкой." />
+                                </StackPanel>
+                                <ToggleButton x:Name="ShortenShellCommandsToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8EB;" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="HideLongNumbersLabelText" Style="{StaticResource FieldLabel}" Text="Скрывать длинные числа и дампы" />
+                                    <TextBlock x:Name="HideLongNumbersHintText" Style="{StaticResource FieldHint}" Text="Base64, hex-дампы и длинные номера сокращаются." />
+                                </StackPanel>
+                                <ToggleButton x:Name="HideLongNumbersToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="TextPreparationToggle_Changed" Unchecked="TextPreparationToggle_Changed" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid x:Name="HotkeysPage" Visibility="Collapsed">
+                        <StackPanel MaxWidth="760" HorizontalAlignment="Stretch">
+                            <TextBlock x:Name="HotkeysPageTitleText" Style="{StaticResource PageTitle}" Text="Горячие клавиши" />
+                            <TextBlock x:Name="HotkeysPageHintText" Style="{StaticResource PageHint}" Text="Нажмите на сочетание, затем зажмите нужные клавиши. Esc отменяет запись, Delete очищает." Margin="0,6,0,24" />
+                            <TextBlock x:Name="HotkeysSectionTitleText" Style="{StaticResource SectionTitle}" Text="Активные сочетания" Margin="0,0,0,12" />
+
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /><ColumnDefinition Width="124" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE765;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="SpeakHotkeyLabelText" Style="{StaticResource FieldLabel}" Text="Озвучить последний ответ" />
+                                    <TextBlock x:Name="SpeakHotkeyHintText" Style="{StaticResource FieldHint}" Text="Копирует последний ответ активного Codex или ChatGPT и запускает озвучку." />
+                                </StackPanel>
+                                <Button x:Name="SpeakLatestHotkeyButton" Grid.Column="2" Tag="SpeakLatest" Style="{StaticResource SecondaryButton}" Content="Ctrl + Alt + V" Click="HotkeyButton_Click" />
+                                <Button x:Name="ClearSpeakLatestHotkeyButton" Grid.Column="3" Tag="SpeakLatest" Style="{StaticResource SecondaryButton}" Content="Сброс" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /><ColumnDefinition Width="124" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE720;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ClipboardHotkeyLabelText" Style="{StaticResource FieldLabel}" Text="Озвучить clipboard" />
+                                    <TextBlock x:Name="ClipboardHotkeyHintText" Style="{StaticResource FieldHint}" Text="Озвучивает текущий текст из буфера обмена." />
+                                </StackPanel>
+                                <Button x:Name="ClipboardHotkeyButton" Grid.Column="2" Tag="Clipboard" Style="{StaticResource SecondaryButton}" Content="Не назначено" Click="HotkeyButton_Click" />
+                                <Button x:Name="ClearClipboardHotkeyButton" Grid.Column="3" Tag="Clipboard" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /><ColumnDefinition Width="124" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE720;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="CodexMicHotkeyLabelText" Style="{StaticResource FieldLabel}" Text="Микрофон приложения" />
+                                    <TextBlock x:Name="CodexMicHotkeyHintText" Style="{StaticResource FieldHint}" Text="Нажимает встроенную кнопку микрофона в активном Codex или ChatGPT." />
+                                </StackPanel>
+                                <Button x:Name="CodexMicHotkeyButton" Grid.Column="2" Tag="CodexMic" Style="{StaticResource SecondaryButton}" Content="Не назначено" Click="HotkeyButton_Click" />
+                                <Button x:Name="ClearCodexMicHotkeyButton" Grid.Column="3" Tag="CodexMic" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
+                            </Grid>
+
+                            <Border Style="{StaticResource InfoCard}" MaxWidth="720" HorizontalAlignment="Left">
+                                <StackPanel><TextBlock x:Name="HotkeyEditorTitleText" Text="Как записать сочетание" Foreground="{StaticResource TextPrimary}" FontSize="17" FontWeight="SemiBold" /><TextBlock x:Name="HotkeyEditorHintText" Text="Нажмите поле сочетания, затем зажмите, например, Ctrl + Alt + V. Для глобального хоткея нужна хотя бы одна служебная клавиша." Foreground="#9FB0C5" FontSize="13.5" TextWrapping="Wrap" LineHeight="21" Margin="0,8,0,0" /></StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                    <Grid x:Name="IntegrationPage" Visibility="Collapsed">
+                        <StackPanel MaxWidth="760" HorizontalAlignment="Stretch">
+                            <TextBlock x:Name="IntegrationPageTitleText" Style="{StaticResource PageTitle}" Text="Интеграция" />
+                            <TextBlock x:Name="IntegrationPageHintText" Style="{StaticResource PageHint}" Text="Автовыбор активного Codex или ChatGPT, Copy/clipboard и запуск микрофона." Margin="0,6,0,24" />
+
+                            <TextBlock x:Name="CodexWindowSectionTitleText" Style="{StaticResource SectionTitle}" Text="Приложения" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,22">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /><ColumnDefinition Width="128" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8A5;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="CodexWindowKeywordsLabelText" Style="{StaticResource FieldLabel}" Text="Ключевые слова Codex" />
+                                    <TextBlock x:Name="CodexWindowKeywordsHintText" Style="{StaticResource FieldHint}" Text="ChatGPT определяется автоматически; здесь можно уточнить заголовок или процесс Codex." />
+                                </StackPanel>
+                                <TextBox x:Name="CodexWindowKeywordsBox" Grid.Column="2" Style="{StaticResource DarkTextBox}" Margin="0,0,12,0" LostFocus="CodexWindowKeywordsBox_LostFocus" KeyDown="CodexWindowKeywordsBox_KeyDown" />
+                                <Button x:Name="TestCodexWindowButton" Grid.Column="3" Style="{StaticResource SecondaryButton}" Content="Проверить" Click="TestCodexWindowButton_Click" />
+                            </Grid>
+
+                            <TextBlock x:Name="CopyIntegrationSectionTitleText" Style="{StaticResource SectionTitle}" Text="Copy и clipboard" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8B8;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="HoverCopyButtonLabelText" Style="{StaticResource FieldLabel}" Text="Показывать Copy наведением" />
+                                    <TextBlock x:Name="HoverCopyButtonHintText" Style="{StaticResource FieldHint}" Text="Если кнопка скрыта до hover, Voice Button наведет курсор в область последнего ответа." />
+                                </StackPanel>
+                                <ToggleButton x:Name="HoverCopyButtonToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D2;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="RestoreClipboardLabelText" Style="{StaticResource FieldLabel}" Text="Восстанавливать clipboard" />
+                                    <TextBlock x:Name="RestoreClipboardHintText" Style="{StaticResource FieldHint}" Text="После Copy возвращает прежний буфер обмена, если это возможно." />
+                                </StackPanel>
+                                <ToggleButton x:Name="RestoreClipboardToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D5;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ClipboardFallbackLabelText" Style="{StaticResource FieldLabel}" Text="Озвучивать clipboard без Copy" />
+                                    <TextBlock x:Name="ClipboardFallbackHintText" Style="{StaticResource FieldHint}" Text="Если Copy не найден, можно озвучить уже скопированный вручную текст." />
+                                </StackPanel>
+                                <ToggleButton x:Name="ClipboardFallbackToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
+                            </Grid>
+
+                            <TextBlock x:Name="MicrophoneIntegrationSectionTitleText" Style="{StaticResource SectionTitle}" Text="Микрофон приложения" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE720;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="RetryMicrophoneLabelText" Style="{StaticResource FieldLabel}" Text="Повторять запуск микрофона" />
+                                    <TextBlock x:Name="RetryMicrophoneHintText" Style="{StaticResource FieldHint}" Text="Повторный клик применяется только к Codex; диктовка ChatGPT запускается один раз." />
+                                </StackPanel>
+                                <ToggleButton x:Name="RetryMicrophoneToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
+                            </Grid>
+
+                            <TextBlock x:Name="DiagnosticsSectionTitleText" Style="{StaticResource SectionTitle}" Text="Диагностика" Margin="0,0,0,12" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE9D9;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="DiagnosticsLabelText" Style="{StaticResource FieldLabel}" Text="Проверить активное приложение" />
+                                    <TextBlock x:Name="DiagnosticsHintText" Style="{StaticResource FieldHint}" Text="Проверяет окно, Copy и микрофон. Результат пишется в diagnostics.log." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
+                                    <Button x:Name="TestCopyButton" Style="{StaticResource SecondaryButton}" Content="Найти Copy" Click="TestCopyButton_Click" />
+                                    <Button x:Name="TestMicrophoneButton" Style="{StaticResource SecondaryButton}" Content="Найти микрофон" Margin="12,0,0,0" Click="TestMicrophoneButton_Click" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <Border Grid.Row="2" BorderBrush="#1B2B40" BorderThickness="0,1,0,0"><Grid Margin="34,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><Button x:Name="StopButton" Style="{StaticResource SecondaryButton}" Content="Стоп" Click="StopButton_Click" /><Button x:Name="ClipboardButton" Style="{StaticResource SecondaryButton}" Content="Озвучить clipboard" Margin="12,0,0,0" Click="ClipboardButton_Click" /></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button x:Name="CancelButton" Style="{StaticResource SecondaryButton}" Content="Свернуть" Margin="0,0,14,0" Click="MinimizeButton_Click" /><Button x:Name="SpeakButton" Style="{StaticResource PrimaryButton}" Content="Озвучить последний ответ" Click="SpeakButton_Click" /></StackPanel></Grid></Border>
+        </Grid>
+    </Border>
+</Window>

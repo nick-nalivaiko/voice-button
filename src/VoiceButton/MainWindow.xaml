@@ -294,6 +294,7 @@
         <Style x:Key="DarkComboBoxItem" TargetType="{x:Type ComboBoxItem}">
             <Setter Property="Foreground" Value="#F4F8FF" />
             <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Margin" Value="0,1" />
             <Setter Property="Padding" Value="12,9" />
             <Setter Property="MinHeight" Value="36" />
             <Setter Property="Template">
@@ -559,6 +560,9 @@
                             <Button x:Name="SpeechNavButton" Tag="Speech" Style="{StaticResource SidebarButton}" Margin="0,12,0,0" Click="SidebarButton_Click">
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock x:Name="SpeechNavIcon" Style="{StaticResource SidebarIcon}" Text="&#xE995;" /><TextBlock x:Name="SpeechNavText" Grid.Column="1" Style="{StaticResource SidebarText}" Text="Озвучка" /></Grid>
                             </Button>
+                            <Button x:Name="DictationNavButton" Tag="Dictation" Style="{StaticResource SidebarButton}" Margin="0,12,0,0" Click="SidebarButton_Click">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock x:Name="DictationNavIcon" Style="{StaticResource SidebarIcon}" Text="&#xE720;" /><TextBlock x:Name="DictationNavText" Grid.Column="1" Style="{StaticResource SidebarText}" Text="Диктовка" /></Grid>
+                            </Button>
                             <Button x:Name="HotkeysNavButton" Tag="Hotkeys" Style="{StaticResource SidebarButton}" Margin="0,12,0,0" Click="SidebarButton_Click">
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock x:Name="HotkeysNavIcon" Style="{StaticResource SidebarIcon}" Text="&#xE765;" /><TextBlock x:Name="HotkeysNavText" Grid.Column="1" Style="{StaticResource SidebarText}" Text="Горячие клавиши" /></Grid>
                             </Button>
@@ -806,6 +810,73 @@
                         </StackPanel>
                     </Grid>
 
+                    <Grid x:Name="DictationPage" Visibility="Collapsed">
+                        <StackPanel MaxWidth="760" HorizontalAlignment="Stretch">
+                            <TextBlock x:Name="DictationPageTitleText" Style="{StaticResource PageTitle}" Text="Диктовка" />
+                            <TextBlock x:Name="DictationPageHintText" Style="{StaticResource PageHint}" Text="Запись речи, распознавание и вставка текста в активное приложение." Margin="0,6,0,24" />
+
+                            <TextBlock x:Name="RecognitionSectionTitleText" Style="{StaticResource SectionTitle}" Text="Распознавание" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE753;" />
+                                <TextBlock x:Name="TranscriptionProviderLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="Поставщик" />
+                                <Border Grid.Column="2" Style="{StaticResource FieldShell}"><TextBlock Text="OpenAI" Foreground="{StaticResource TextPrimary}" FontSize="16" VerticalAlignment="Center" /></Border>
+                            </Grid>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8B8;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TranscriptionModelLabelText" Style="{StaticResource FieldLabel}" Text="Модель распознавания" />
+                                    <TextBlock x:Name="TranscriptionModelHintText" Style="{StaticResource FieldHint}" Text="Основная модель точнее, mini дешевле." />
+                                </StackPanel>
+                                <ComboBox x:Name="TranscriptionModelComboBox" Grid.Column="2" Style="{StaticResource DarkComboBox}" SelectionChanged="TranscriptionModelComboBox_SelectionChanged" />
+                            </Grid>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE774;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TranscriptionLanguageLabelText" Style="{StaticResource FieldLabel}" Text="Язык речи" />
+                                    <TextBlock x:Name="TranscriptionLanguageHintText" Style="{StaticResource FieldHint}" Text="Авто подходит, если языки меняются." />
+                                </StackPanel>
+                                <ComboBox x:Name="TranscriptionLanguageComboBox" Grid.Column="2" Style="{StaticResource DarkComboBox}" SelectionChanged="TranscriptionLanguageComboBox_SelectionChanged" />
+                            </Grid>
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D7;" />
+                                <TextBlock x:Name="DictationKeyLabelText" Grid.Column="1" Style="{StaticResource FieldLabel}" Text="OpenAI API key" />
+                                <Border Grid.Column="2" Style="{StaticResource FieldShell}">
+                                    <TextBlock x:Name="DictationKeyHintText" Text="Используется ключ из раздела «Озвучка»." Foreground="#9FB0C5" FontSize="14" VerticalAlignment="Center" />
+                                </Border>
+                            </Grid>
+
+                            <TextBlock x:Name="DictationBehaviorSectionTitleText" Style="{StaticResource SectionTitle}" Text="Поведение" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D2;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="InsertDictationLabelText" Style="{StaticResource FieldLabel}" Text="Вставлять текст автоматически" />
+                                    <TextBlock x:Name="InsertDictationHintText" Style="{StaticResource FieldHint}" Text="Если курсор стоит в поле ввода, текст вставится туда; иначе останется в clipboard." />
+                                </StackPanel>
+                                <ToggleButton x:Name="InsertDictationToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="DictationToggle_Changed" Unchecked="DictationToggle_Changed" />
+                            </Grid>
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE8D5;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="RestoreDictationClipboardLabelText" Style="{StaticResource FieldLabel}" Text="Восстанавливать clipboard после вставки" />
+                                    <TextBlock x:Name="RestoreDictationClipboardHintText" Style="{StaticResource FieldHint}" Text="После успешной вставки возвращает прежнее содержимое буфера обмена." />
+                                </StackPanel>
+                                <ToggleButton x:Name="RestoreDictationClipboardToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="DictationToggle_Changed" Unchecked="DictationToggle_Changed" />
+                            </Grid>
+
+                            <Border Style="{StaticResource InfoCard}">
+                                <StackPanel>
+                                    <TextBlock x:Name="DictationRoutingTitleText" Text="Как работает кнопка микрофона" Foreground="{StaticResource TextPrimary}" FontSize="17" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="DictationRoutingHintText" Text="В Codex и ChatGPT запускается встроенный микрофон. В Telegram, Блокноте, браузере и других приложениях Voice Button записывает речь и вставляет готовый текст." Foreground="#9FB0C5" FontSize="13.5" TextWrapping="Wrap" LineHeight="21" Margin="0,8,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
                     <Grid x:Name="HotkeysPage" Visibility="Collapsed">
                         <StackPanel MaxWidth="760" HorizontalAlignment="Stretch">
                             <TextBlock x:Name="HotkeysPageTitleText" Style="{StaticResource PageTitle}" Text="Горячие клавиши" />

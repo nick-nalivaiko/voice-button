@@ -51,13 +51,22 @@
                     </Border.Background>
                     <Grid>
                         <Ellipse Margin="7" Stroke="#1E96FF" StrokeThickness="1" Opacity="0.26" />
-                        <Path Fill="#37D0F4"
+                        <Path x:Name="CompactMicrophoneGlyph" Fill="#37D0F4"
                               Data="M 12 4 C 9.8 4 8 5.8 8 8 L 8 16 C 8 18.2 9.8 20 12 20 C 14.2 20 16 18.2 16 16 L 16 8 C 16 5.8 14.2 4 12 4 Z M 5 14 C 5 18 8 21 12 21 C 16 21 19 18 19 14 L 17 14 C 17 16.9 14.9 19 12 19 C 9.1 19 7 16.9 7 14 Z M 11 21 L 13 21 L 13 25 L 17 25 L 17 27 L 7 27 L 7 25 L 11 25 Z"
                               Width="22"
                               Height="24"
                               Stretch="Uniform"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center" />
+                        <Grid x:Name="CompactRecordingGlyph" Visibility="Collapsed">
+                            <Ellipse Margin="7" Fill="#123B72" Stroke="#37D0F4" StrokeThickness="1.2" />
+                            <Border Width="11"
+                                    Height="11"
+                                    CornerRadius="2.5"
+                                    Background="#37D0F4"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                        </Grid>
                     </Grid>
                 </Border>
 

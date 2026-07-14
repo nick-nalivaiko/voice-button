@@ -16,6 +16,10 @@ internal static class NativeMethods
     public const uint ModNoRepeat = 0x4000;
     public const uint MouseEventLeftDown = 0x0002;
     public const uint MouseEventLeftUp = 0x0004;
+    public const uint InputKeyboard = 1;
+    public const uint KeyEventKeyUp = 0x0002;
+    public const ushort VkControl = 0x11;
+    public const ushort VkV = 0x56;
 
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
@@ -24,6 +28,9 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     public static extern bool IsIconic(IntPtr hWnd);
@@ -66,6 +73,86 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint inputCount, Input[] inputs, int size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Input
+    {
+        public uint Type;
+        public InputUnion Data;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct InputUnion
+    {
+        [FieldOffset(0)]
+        public MouseInput Mouse;
+
+        [FieldOffset(0)]
+        public KeyboardInput Keyboard;
+
+        [FieldOffset(0)]
+        public HardwareInput Hardware;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KeyboardInput
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct HardwareInput
+    {
+        public uint Message;
+        public ushort ParameterLow;
+        public ushort ParameterHigh;
+    }
+
+    public static bool SendPasteShortcut()
+    {
+        var inputs = new[]
+        {
+            CreateKeyInput(VkControl, 0),
+            CreateKeyInput(VkV, 0),
+            CreateKeyInput(VkV, KeyEventKeyUp),
+            CreateKeyInput(VkControl, KeyEventKeyUp)
+        };
+        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>()) == inputs.Length;
+    }
+
+    private static Input CreateKeyInput(ushort virtualKey, uint flags)
+    {
+        return new Input
+        {
+            Type = InputKeyboard,
+            Data = new InputUnion
+            {
+                Keyboard = new KeyboardInput
+                {
+                    VirtualKey = virtualKey,
+                    Flags = flags
+                }
+            }
+        };
+    }
 
     public static string GetWindowTitle(IntPtr hWnd)
     {

@@ -4,24 +4,25 @@
 ![Windows](https://img.shields.io/badge/platform-Windows-1E96FF)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
 
-Voice Button is a compact Windows companion for **Codex** and **ChatGPT**. It copies the latest assistant answer through the application's own Copy action, converts it to speech with OpenAI TTS, and gives you a floating control for speech playback and built-in dictation.
+Voice Button is a compact Windows speech companion. It reads the latest **Codex** or **ChatGPT** answer through the application's own Copy action, converts it to speech with OpenAI TTS, and provides context-aware voice input for supported assistants and other Windows applications.
 
 ![Voice Button general settings](docs/screenshots/general.png)
 
 ## Highlights
 
-- **Active-app aware**: works with the active Codex or ChatGPT window.
+- **Active-app aware**: uses the built-in microphone in Codex and ChatGPT, and Voice Button dictation everywhere else.
 - **Latest answer only**: targets assistant Copy actions instead of reading the user's prompt.
 - **OpenAI text-to-speech**: model, voice, and playback speed are configurable.
 - **Buffered streaming playback**: starts once ten seconds are buffered (or a shorter clip is complete) and protects a four-second reserve during network slowdowns.
 - **Floating controls**: microphone on the left, speech on the right, and an expanding player during playback.
 - **Real playback controls**: pause/resume, waveform seeking, elapsed time, and stop.
-- **Global hotkeys**: configurable shortcuts for the latest answer, clipboard speech, and application microphone.
+- **Universal dictation**: records speech, transcribes it with OpenAI, and inserts it into the focused input field or leaves it in the clipboard.
+- **Global hotkeys**: configurable shortcuts for the latest answer, clipboard speech, and context-aware microphone action.
 - **Clipboard protection**: restores the previous clipboard value when possible.
 - **Speech cleanup**: removes or shortens paths, code, links, secrets, hashes, stack traces, tables, structured data, shell commands, and long numeric identifiers.
 - **Long-answer support**: sanitizes and chunks long replies before sequential playback.
 - **Portable-friendly security**: API keys saved in the UI are stored in Windows Credential Manager, not inside the portable folder.
-- **Three interface languages**: English, Ukrainian, and Russian.
+- **Three interface languages**: English, Ukrainian, and Russian, selected from the Windows UI language on first launch.
 - **Tray support**: minimize to tray, optional Windows startup, remembered floating-button position, and local diagnostics.
 
 ## Floating controls
@@ -32,7 +33,7 @@ The compact control stays out of the way until playback starts. During speech it
 | --- | --- |
 | <img src="docs/screenshots/floating-button.png" alt="Compact Voice Button control" width="184"> | <img src="docs/screenshots/floating-player.png" alt="Expanded Voice Button player" width="548"> |
 
-- **Left**: start dictation when idle; pause or resume during playback.
+- **Left**: use the built-in microphone in Codex or ChatGPT; start Voice Button dictation in other applications; pause or resume during playback.
 - **Center**: start speech when idle; click or drag the waveform to seek during playback.
 - **Right**: stop the current playback.
 
@@ -47,6 +48,16 @@ Configure the provider, API key, speech model, voice, speed, and voice preview.
 The speech-preparation pipeline can keep useful prose while avoiding content that is unpleasant or unsafe to read aloud.
 
 ![Speech cleanup filters](docs/screenshots/speech-filters.png)
+
+### Dictation
+
+Choose the OpenAI transcription model and spoken-language hint. Automatic language detection is the default. Voice Button remembers the application and keyboard focus present when recording starts, then sends the completed transcript back to that target.
+
+![Dictation settings](docs/screenshots/dictation.png)
+
+For standard editable controls, the previous clipboard value can be restored after insertion. For custom editors such as Telegram or Notion, Voice Button also keeps the transcript in the clipboard after the paste attempt, so the text is not lost if the target rejects synthetic input.
+
+Codex and ChatGPT are explicit exceptions: the microphone action keeps using their own built-in dictation and does not send a second transcription request.
 
 ### Hotkeys
 
@@ -144,13 +155,16 @@ git config core.hooksPath .githooks
 6. Each MP3 response begins playing from a ten-second buffer, or as soon as a shorter clip is complete, while the remaining audio continues to arrive.
 7. Audio is played in order through the floating seekable player, with automatic rebuffering when needed.
 
-The primary path does not use screenshots or OCR.
+The primary answer-reading path does not use screenshots or OCR.
+
+For dictation, Voice Button captures 16 kHz mono audio locally, sends the completed WAV recording to the selected OpenAI transcription model, restores the original target application, and sends Ctrl+V when keyboard focus still belongs to that target. The transcript remains available in the clipboard whenever insertion cannot be verified.
 
 ## Known limitations
 
 - Codex or ChatGPT UI updates can require selector adjustments.
 - Copy controls that only appear on hover depend on the hover-reveal fallback.
 - The target application must expose enough information through Windows UI Automation.
+- Elevated, protected, or accessibility-limited applications can reject synthetic paste input; clipboard fallback remains available.
 - OpenAI API usage is billed by OpenAI according to the account attached to the API key.
 
 ## Repository structure
@@ -165,4 +179,4 @@ VoiceButton.sln                 Visual Studio solution
 
 ## Status
 
-Voice Button is a working MVP for Windows. The current build supports Codex and ChatGPT answer playback, application dictation, configurable hotkeys, a floating seekable player, speech cleanup, tray behavior, diagnostics, and portable settings.
+Voice Button is a working Windows utility with Codex and ChatGPT answer playback, context-aware built-in microphone control, universal dictation, configurable hotkeys, a floating seekable player, speech cleanup, tray behavior, diagnostics, and portable settings.

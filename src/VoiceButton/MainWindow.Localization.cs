@@ -8,10 +8,12 @@ public partial class MainWindow
     {
         ["NavGeneral"] = new[] { "Общие", "Загальні", "General" },
         ["NavSpeech"] = new[] { "Озвучка", "Озвучення", "Speech" },
+        ["NavDictation"] = new[] { "Диктовка", "Диктування", "Dictation" },
         ["NavHotkeys"] = new[] { "Горячие клавиши", "Гарячі клавіші", "Hotkeys" },
         ["NavIntegration"] = new[] { "Интеграция", "Інтеграція", "Integration" },
         ["HeaderGeneral"] = new[] { "Настройки Voice Button", "Налаштування Voice Button", "Voice Button Settings" },
         ["HeaderSpeech"] = new[] { "Настройки озвучки", "Налаштування озвучення", "Speech Settings" },
+        ["HeaderDictation"] = new[] { "Настройки диктовки", "Налаштування диктування", "Dictation Settings" },
         ["HeaderHotkeys"] = new[] { "Горячие клавиши", "Гарячі клавіші", "Hotkeys" },
         ["HeaderIntegration"] = new[] { "Codex и ChatGPT", "Codex і ChatGPT", "Codex and ChatGPT" },
         ["GeneralPageTitle"] = new[] { "Общие", "Загальні", "General" },
@@ -30,6 +32,48 @@ public partial class MainWindow
         ["ResetFloatingPositionButton"] = new[] { "Сбросить позицию кнопки", "Скинути позицію кнопки", "Reset button position" },
         ["SpeechPageTitle"] = new[] { "Озвучка", "Озвучення", "Speech" },
         ["SpeechPageHint"] = new[] { "OpenAI, модель, голос и подготовка текста перед озвучкой.", "OpenAI, модель, голос і підготовка тексту перед озвученням.", "OpenAI, model, voice, and text preparation before playback." },
+        ["DictationPageTitle"] = new[] { "Диктовка", "Диктування", "Dictation" },
+        ["DictationPageHint"] = new[] { "Запись с микрофона, распознавание и вставка текста в активное приложение.", "Запис із мікрофона, розпізнавання та вставлення тексту в активну програму.", "Microphone recording, transcription, and text insertion into the active application." },
+        ["RecognitionSectionTitle"] = new[] { "Распознавание", "Розпізнавання", "Recognition" },
+        ["TranscriptionProviderLabel"] = new[] { "Поставщик", "Постачальник", "Provider" },
+        ["TranscriptionModelLabel"] = new[] { "Модель распознавания", "Модель розпізнавання", "Transcription model" },
+        ["TranscriptionModelHint"] = new[] { "Основная модель точнее, mini дешевле.", "Основна модель точніша, mini дешевша.", "The main model is more accurate; mini costs less." },
+        ["TranscriptionLanguageLabel"] = new[] { "Язык речи", "Мова мовлення", "Spoken language" },
+        ["TranscriptionLanguageHint"] = new[] { "Авто подходит, если языки меняются.", "Авто підходить, якщо мови змінюються.", "Auto works best when spoken languages change." },
+        ["TranscriptionLanguageAuto"] = new[] { "Автоматически", "Автоматично", "Automatic" },
+        ["TranscriptionLanguageRussian"] = new[] { "Русский", "Російська", "Russian" },
+        ["TranscriptionLanguageUkrainian"] = new[] { "Украинский", "Українська", "Ukrainian" },
+        ["TranscriptionLanguageEnglish"] = new[] { "Английский", "Англійська", "English" },
+        ["DictationKeyLabel"] = new[] { "OpenAI API key", "OpenAI API key", "OpenAI API key" },
+        ["DictationKeyHint"] = new[] { "Используется ключ из раздела «Озвучка».", "Використовується ключ із розділу «Озвучення».", "Uses the key from the Speech section." },
+        ["DictationBehaviorSectionTitle"] = new[] { "Поведение", "Поведінка", "Behavior" },
+        ["InsertDictationLabel"] = new[] { "Вставлять текст автоматически", "Вставляти текст автоматично", "Insert text automatically" },
+        ["InsertDictationHint"] = new[] { "Если курсор стоит в поле ввода, текст вставится туда; иначе останется в clipboard.", "Якщо курсор стоїть у полі вводу, текст вставиться туди; інакше залишиться в clipboard.", "If an input field has focus, text is inserted there; otherwise it remains in the clipboard." },
+        ["RestoreDictationClipboardLabel"] = new[] { "Восстанавливать clipboard после вставки", "Відновлювати clipboard після вставлення", "Restore clipboard after insertion" },
+        ["RestoreDictationClipboardHint"] = new[] { "После успешной вставки возвращает прежнее содержимое буфера обмена.", "Після успішного вставлення повертає попередній вміст буфера обміну.", "Restores the previous clipboard contents after a successful insertion." },
+        ["DictationRoutingTitle"] = new[] { "Как работает кнопка микрофона", "Як працює кнопка мікрофона", "How the microphone button works" },
+        ["DictationRoutingHint"] = new[] { "В Codex и ChatGPT запускается встроенный микрофон. В Telegram, Блокноте, браузере и других приложениях Voice Button записывает речь и вставляет готовый текст.", "У Codex і ChatGPT запускається вбудований мікрофон. У Telegram, Блокноті, браузері та інших програмах Voice Button записує мовлення й вставляє готовий текст.", "Codex and ChatGPT use their built-in microphone. In Telegram, Notepad, browsers, and other apps, Voice Button records speech and inserts the finished text." },
+        ["DictationSettingsSaved"] = new[] { "Настройки диктовки сохранены.", "Налаштування диктування збережено.", "Dictation settings saved." },
+        ["DictationBusy"] = new[] { "Диктовка занята", "Диктування зайняте", "Dictation is busy" },
+        ["DictationBusyDetail"] = new[] { "Заверши текущее действие или нажми Стоп.", "Заверши поточну дію або натисни Стоп.", "Finish the current action or press Stop." },
+        ["DictationListening"] = new[] { "Слушаю", "Слухаю", "Listening" },
+        ["DictationListeningInsertDetail"] = new[] { "Нажми микрофон ещё раз: текст будет вставлен в выбранное поле.", "Натисни мікрофон ще раз: текст буде вставлено у вибране поле.", "Press the microphone again to insert text into the selected field." },
+        ["DictationListeningClipboardDetail"] = new[] { "Поле ввода не выбрано: результат останется в clipboard.", "Поле вводу не вибрано: результат залишиться в clipboard.", "No input field is selected; the result will remain in the clipboard." },
+        ["DictationTranscribing"] = new[] { "Распознаю речь", "Розпізнаю мовлення", "Transcribing" },
+        ["DictationTranscribingDetail"] = new[] { "Отправляю запись в OpenAI и готовлю текст.", "Надсилаю запис до OpenAI та готую текст.", "Sending the recording to OpenAI and preparing text." },
+        ["DictationInserted"] = new[] { "Текст вставлен", "Текст вставлено", "Text inserted" },
+        ["DictationInsertedDetail"] = new[] { "Распознанный текст добавлен в выбранное поле.", "Розпізнаний текст додано у вибране поле.", "The transcript was added to the selected input field." },
+        ["DictationPasteAttempted"] = new[] { "Вставка отправлена", "Вставлення надіслано", "Paste sent" },
+        ["DictationPasteAttemptedDetail"] = new[] { "Команда вставки отправлена приложению. Текст также оставлен в clipboard.", "Команду вставлення надіслано програмі. Текст також залишено в clipboard.", "The paste command was sent to the app. The text also remains in the clipboard." },
+        ["DictationCopied"] = new[] { "Текст в clipboard", "Текст у clipboard", "Text copied" },
+        ["DictationCopiedDetail"] = new[] { "Поле ввода не найдено. Текст можно вставить вручную.", "Поле вводу не знайдено. Текст можна вставити вручну.", "No input field was found. Paste the text manually." },
+        ["DictationCanceled"] = new[] { "Диктовка остановлена", "Диктування зупинено", "Dictation stopped" },
+        ["DictationCanceledDetail"] = new[] { "Запись или распознавание отменено.", "Запис або розпізнавання скасовано.", "Recording or transcription was canceled." },
+        ["FloatingMicTooltip"] = new[] { "Микрофон приложения или диктовка / озвучить последний ответ", "Мікрофон програми або диктування / озвучити останню відповідь", "App microphone or dictation / speak latest answer" },
+        ["FloatingRecordingTooltip"] = new[] { "Остановить запись и вставить текст", "Зупинити запис і вставити текст", "Stop recording and insert text" },
+        ["FloatingProcessingTooltip"] = new[] { "Распознаю речь", "Розпізнаю мовлення", "Transcribing speech" },
+        ["FloatingPauseTooltip"] = new[] { "Продолжить / перемотка / стоп", "Продовжити / перемотування / стоп", "Resume / seek / stop" },
+        ["FloatingPlayTooltip"] = new[] { "Пауза / перемотка / стоп", "Пауза / перемотування / стоп", "Pause / seek / stop" },
         ["OpenAiSectionTitle"] = new[] { "OpenAI", "OpenAI", "OpenAI" },
         ["ProviderLabel"] = new[] { "Поставщик", "Постачальник", "Provider" },
         ["ApiKeyLabel"] = new[] { "OpenAI API key", "OpenAI API key", "OpenAI API key" },
@@ -75,8 +119,8 @@ public partial class MainWindow
         ["SpeakHotkeyHint"] = new[] { "Копирует последний ответ активного Codex или ChatGPT и запускает озвучку.", "Копіює останню відповідь активного Codex або ChatGPT і запускає озвучення.", "Copies the latest answer from the active Codex or ChatGPT window and starts playback." },
         ["ClipboardHotkeyLabel"] = new[] { "Озвучить clipboard", "Озвучити clipboard", "Speak clipboard" },
         ["ClipboardHotkeyHint"] = new[] { "Озвучивает текущий текст из буфера обмена.", "Озвучує поточний текст із буфера обміну.", "Speaks the current clipboard text." },
-        ["CodexMicLabel"] = new[] { "Микрофон приложения", "Мікрофон програми", "App microphone" },
-        ["CodexMicHotkeyHint"] = new[] { "Нажимает встроенную кнопку микрофона в активном Codex или ChatGPT.", "Натискає вбудовану кнопку мікрофона в активному Codex або ChatGPT.", "Presses the built-in microphone button in the active Codex or ChatGPT window." },
+        ["CodexMicLabel"] = new[] { "Микрофон / диктовка", "Мікрофон / диктування", "Microphone / dictation" },
+        ["CodexMicHotkeyHint"] = new[] { "В Codex и ChatGPT включает встроенный микрофон, в остальных приложениях запускает диктовку.", "У Codex і ChatGPT вмикає вбудований мікрофон, в інших програмах запускає диктування.", "Uses the built-in microphone in Codex and ChatGPT, and starts dictation in other apps." },
         ["UnassignedHotkey"] = new[] { "Не назначено", "Не призначено", "Not assigned" },
         ["ResetHotkeyButton"] = new[] { "Сброс", "Скинути", "Reset" },
         ["ClearHotkeyButton"] = new[] { "Очистить", "Очистити", "Clear" },
@@ -145,6 +189,7 @@ public partial class MainWindow
     {
         GeneralNavText.Text = Tr("NavGeneral");
         SpeechNavText.Text = Tr("NavSpeech");
+        DictationNavText.Text = Tr("NavDictation");
         HotkeysNavText.Text = Tr("NavHotkeys");
         IntegrationNavText.Text = Tr("NavIntegration");
         GeneralPageTitleText.Text = Tr("GeneralPageTitle");
@@ -163,6 +208,24 @@ public partial class MainWindow
         ResetFloatingPositionButton.Content = Tr("ResetFloatingPositionButton");
         SpeechPageTitleText.Text = Tr("SpeechPageTitle");
         SpeechPageHintText.Text = Tr("SpeechPageHint");
+        DictationPageTitleText.Text = Tr("DictationPageTitle");
+        DictationPageHintText.Text = Tr("DictationPageHint");
+        RecognitionSectionTitleText.Text = Tr("RecognitionSectionTitle");
+        TranscriptionProviderLabelText.Text = Tr("TranscriptionProviderLabel");
+        TranscriptionModelLabelText.Text = Tr("TranscriptionModelLabel");
+        TranscriptionModelHintText.Text = Tr("TranscriptionModelHint");
+        TranscriptionLanguageLabelText.Text = Tr("TranscriptionLanguageLabel");
+        TranscriptionLanguageHintText.Text = Tr("TranscriptionLanguageHint");
+        DictationKeyLabelText.Text = Tr("DictationKeyLabel");
+        DictationKeyHintText.Text = Tr("DictationKeyHint");
+        DictationBehaviorSectionTitleText.Text = Tr("DictationBehaviorSectionTitle");
+        InsertDictationLabelText.Text = Tr("InsertDictationLabel");
+        InsertDictationHintText.Text = Tr("InsertDictationHint");
+        RestoreDictationClipboardLabelText.Text = Tr("RestoreDictationClipboardLabel");
+        RestoreDictationClipboardHintText.Text = Tr("RestoreDictationClipboardHint");
+        DictationRoutingTitleText.Text = Tr("DictationRoutingTitle");
+        DictationRoutingHintText.Text = Tr("DictationRoutingHint");
+        RefreshTranscriptionLanguageOptions();
         OpenAiSectionTitleText.Text = Tr("OpenAiSectionTitle");
         ProviderLabelText.Text = Tr("ProviderLabel");
         ApiKeyLabelText.Text = Tr("ApiKeyLabel");
@@ -242,6 +305,7 @@ public partial class MainWindow
         SpeakButton.Content = Tr("SpeakButton");
         AccentHintText.Text = Tr("AccentHint");
         UpdateHeaderTitle();
+        ApplyFloatingButtonLocalization();
         ApplyAccessibilityNames();
         RefreshApiKeyStatus();
     }
@@ -251,10 +315,21 @@ public partial class MainWindow
         HeaderTitle.Text = _currentPage switch
         {
             "Speech" => Tr("HeaderSpeech"),
+            "Dictation" => Tr("HeaderDictation"),
             "Hotkeys" => Tr("HeaderHotkeys"),
             "Integration" => Tr("HeaderIntegration"),
             _ => Tr("HeaderGeneral")
         };
+    }
+
+    private void ApplyFloatingButtonLocalization()
+    {
+        _floatingButtonWindow?.SetLocalizedTooltips(
+            Tr("FloatingMicTooltip"),
+            Tr("FloatingRecordingTooltip"),
+            Tr("FloatingProcessingTooltip"),
+            Tr("FloatingPauseTooltip"),
+            Tr("FloatingPlayTooltip"));
     }
 
     private string Tr(string key)

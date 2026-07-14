@@ -24,9 +24,13 @@ public partial class MainWindow : Window
     private readonly AppSettingsStore _appSettingsStore = new();
     private readonly AppSettings _appSettings;
     private readonly ClipboardService _clipboardService = new();
+    private readonly CodexWindowFinder _codexWindowFinder;
     private readonly CodexCopyService _codexCopyService;
     private readonly CodexMicrophoneService _codexMicrophoneService;
     private readonly OpenAiSpeechClient _speechClient;
+    private readonly OpenAiTranscriptionClient _transcriptionClient;
+    private readonly DictationRecorderService _dictationRecorderService = new();
+    private readonly DictationTextInsertionService _dictationTextInsertionService;
     private readonly OpenAiCredentialStore _credentialStore = new();
     private readonly AudioPlaybackService _audioPlaybackService;
     private readonly GlobalHotkeyService _hotkeyService = new();
@@ -43,6 +47,10 @@ public partial class MainWindow : Window
     private bool _exitRequested;
     private bool _isInitializing = true;
     private bool _isRefreshingVoiceOptions;
+    private bool _isRefreshingTranscriptionLanguageOptions;
+    private bool _isDictationProcessing;
+    private DictationTarget? _dictationTarget;
+    private CancellationTokenSource? _dictationRun;
     private string _currentPage = "General";
     private string? _capturingHotkeyId;
 
@@ -58,15 +66,19 @@ public partial class MainWindow : Window
 
         InitializeApiKeyStorage();
 
-        var codexWindowFinder = new CodexWindowFinder(_appSettings);
-        _codexCopyService = new CodexCopyService(codexWindowFinder, _clipboardService, _appSettings);
-        _codexMicrophoneService = new CodexMicrophoneService(codexWindowFinder, _appSettings);
+        _codexWindowFinder = new CodexWindowFinder(_appSettings);
+        _codexCopyService = new CodexCopyService(_codexWindowFinder, _clipboardService, _appSettings);
+        _codexMicrophoneService = new CodexMicrophoneService(_codexWindowFinder, _appSettings);
         _speechClient = new OpenAiSpeechClient(new HttpClient());
+        _transcriptionClient = new OpenAiTranscriptionClient(new HttpClient());
+        _dictationTextInsertionService = new DictationTextInsertionService(_clipboardService);
         _audioPlaybackService = new AudioPlaybackService(Dispatcher);
         _audioPlaybackService.PlaybackChanged += AudioPlaybackService_PlaybackChanged;
 
         _appSettings.InterfaceLanguage = NormalizeInterfaceLanguage(_appSettings.InterfaceLanguage);
         _appSettings.SpeechModel = NormalizeSpeechModel(_appSettings.SpeechModel);
+        _appSettings.TranscriptionModel = NormalizeTranscriptionModel(_appSettings.TranscriptionModel);
+        _appSettings.TranscriptionLanguage = NormalizeTranscriptionLanguage(_appSettings.TranscriptionLanguage);
         _settings.Model = _appSettings.SpeechModel;
         _settings.Voice = string.IsNullOrWhiteSpace(_appSettings.Voice) ? _settings.Voice : _appSettings.Voice;
         _settings.Speed = NormalizeSpeechSpeed(_appSettings.SpeechSpeed);
@@ -84,6 +96,14 @@ public partial class MainWindow : Window
         InterfaceLanguageComboBox.DisplayMemberPath = nameof(InterfaceLanguageOption.Label);
         InterfaceLanguageComboBox.SelectedValuePath = nameof(InterfaceLanguageOption.Id);
         InterfaceLanguageComboBox.SelectedValue = _appSettings.InterfaceLanguage;
+
+        TranscriptionModelComboBox.ItemsSource = TranscriptionModelOption.All;
+        TranscriptionModelComboBox.DisplayMemberPath = nameof(TranscriptionModelOption.Label);
+        TranscriptionModelComboBox.SelectedValuePath = nameof(TranscriptionModelOption.Id);
+        TranscriptionModelComboBox.SelectedValue = _appSettings.TranscriptionModel;
+        TranscriptionLanguageComboBox.DisplayMemberPath = nameof(LocalizedOption.Label);
+        TranscriptionLanguageComboBox.SelectedValuePath = nameof(LocalizedOption.Id);
+
         SpeedSlider.Value = _settings.Speed;
         SpeedValueText.Text = FormatSpeechSpeed(_settings.Speed);
 
@@ -107,6 +127,8 @@ public partial class MainWindow : Window
         RestoreClipboardToggle.IsChecked = _appSettings.RestoreClipboardAfterCopy;
         ClipboardFallbackToggle.IsChecked = _appSettings.FallbackToClipboardWhenCopyMissing;
         RetryMicrophoneToggle.IsChecked = _appSettings.RetryMicrophoneIfInactive;
+        InsertDictationToggle.IsChecked = _appSettings.InsertDictationAutomatically;
+        RestoreDictationClipboardToggle.IsChecked = _appSettings.RestoreClipboardAfterDictation;
         _appSettings.StartWithWindows = IsStartWithWindowsEnabled();
         StartWithWindowsToggle.IsChecked = _appSettings.StartWithWindows;
         _isInitializing = false;
@@ -156,7 +178,9 @@ public partial class MainWindow : Window
     {
         if (ModelComboBox.IsDropDownOpen
             || VoiceComboBox.IsDropDownOpen
-            || InterfaceLanguageComboBox.IsDropDownOpen)
+            || InterfaceLanguageComboBox.IsDropDownOpen
+            || TranscriptionModelComboBox.IsDropDownOpen
+            || TranscriptionLanguageComboBox.IsDropDownOpen)
         {
             return;
         }
@@ -188,6 +212,8 @@ public partial class MainWindow : Window
     {
         if (_exitRequested)
         {
+            _dictationRun?.Cancel();
+            _dictationRecorderService.Dispose();
             _floatingButtonWindow?.Close();
             _hotkeyService.Dispose();
             _trayIconService?.Dispose();
@@ -607,11 +633,13 @@ public partial class MainWindow : Window
         _currentPage = page;
         GeneralPage.Visibility = page == "General" ? Visibility.Visible : Visibility.Collapsed;
         SpeechPage.Visibility = page == "Speech" ? Visibility.Visible : Visibility.Collapsed;
+        DictationPage.Visibility = page == "Dictation" ? Visibility.Visible : Visibility.Collapsed;
         HotkeysPage.Visibility = page == "Hotkeys" ? Visibility.Visible : Visibility.Collapsed;
         IntegrationPage.Visibility = page == "Integration" ? Visibility.Visible : Visibility.Collapsed;
 
         SetNavigationState(GeneralNavButton, GeneralNavIcon, page == "General");
         SetNavigationState(SpeechNavButton, SpeechNavIcon, page == "Speech");
+        SetNavigationState(DictationNavButton, DictationNavIcon, page == "Dictation");
         SetNavigationState(HotkeysNavButton, HotkeysNavIcon, page == "Hotkeys");
         SetNavigationState(IntegrationNavButton, IntegrationNavIcon, page == "Integration");
 
@@ -656,7 +684,31 @@ public partial class MainWindow : Window
     {
         return InterfaceLanguageOption.All.Any(option => string.Equals(option.Id, language, StringComparison.Ordinal))
             ? language!
-            : "ru";
+            : InterfaceLanguageOption.DetectWindowsLanguage();
+    }
+
+    private static string NormalizeTranscriptionModel(string? model)
+    {
+        return TranscriptionModelOption.All.Any(option => string.Equals(option.Id, model, StringComparison.Ordinal))
+            ? model!
+            : "gpt-4o-transcribe";
+    }
+
+    private static string NormalizeTranscriptionLanguage(string? language)
+    {
+        return TranscriptionLanguageOption.All.Any(option => string.Equals(option.Id, language, StringComparison.Ordinal))
+            ? language!
+            : "auto";
+    }
+
+    private void RefreshTranscriptionLanguageOptions()
+    {
+        _isRefreshingTranscriptionLanguageOptions = true;
+        TranscriptionLanguageComboBox.ItemsSource = TranscriptionLanguageOption.All
+            .Select(option => new LocalizedOption(option.Id, Tr(option.TranslationKey)))
+            .ToArray();
+        TranscriptionLanguageComboBox.SelectedValue = _appSettings.TranscriptionLanguage;
+        _isRefreshingTranscriptionLanguageOptions = false;
     }
 
     private static double NormalizeSpeechSpeed(double speed)
@@ -685,6 +737,50 @@ public partial class MainWindow : Window
 
         _appSettingsStore.Save(_appSettings);
         SetStatus(Tr("InterfaceLanguage"), Tr("InterfaceLanguageDetail"), "#41D6A1", busy: false);
+    }
+
+    private void TranscriptionModelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (TranscriptionModelComboBox.SelectedValue is not string model)
+        {
+            return;
+        }
+
+        _appSettings.TranscriptionModel = NormalizeTranscriptionModel(model);
+        if (!_isInitializing)
+        {
+            _appSettingsStore.Save(_appSettings);
+            SetStatus(Tr("TranscriptionModelLabel"), _appSettings.TranscriptionModel, "#41D6A1", busy: false);
+        }
+    }
+
+    private void TranscriptionLanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isRefreshingTranscriptionLanguageOptions
+            || TranscriptionLanguageComboBox.SelectedValue is not string language)
+        {
+            return;
+        }
+
+        _appSettings.TranscriptionLanguage = NormalizeTranscriptionLanguage(language);
+        if (!_isInitializing)
+        {
+            _appSettingsStore.Save(_appSettings);
+            SetStatus(Tr("TranscriptionLanguageLabel"), Tr("DictationSettingsSaved"), "#41D6A1", busy: false);
+        }
+    }
+
+    private void DictationToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _appSettings.InsertDictationAutomatically = InsertDictationToggle.IsChecked == true;
+        _appSettings.RestoreClipboardAfterDictation = RestoreDictationClipboardToggle.IsChecked == true;
+        _appSettingsStore.Save(_appSettings);
+        SetStatus(Tr("DictationPageTitle"), Tr("DictationSettingsSaved"), "#41D6A1", busy: false);
     }
 
     private void SpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -940,6 +1036,23 @@ public partial class MainWindow : Window
 
     private async Task StartVoiceInputOrWhileStoppedAsync()
     {
+        if (_dictationRecorderService.IsRecording)
+        {
+            await StopDictationAsync();
+            return;
+        }
+
+        if (_isDictationProcessing)
+        {
+            return;
+        }
+
+        if (_codexWindowFinder.FindForegroundWindow() is null)
+        {
+            StartDictation();
+            return;
+        }
+
         if (!_playbackStopped || _currentRun is null)
         {
             await StartActiveVoiceInputAsync();
@@ -953,7 +1066,109 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            SetStatus("Ошибка", ex.Message, "#F25F5C", busy: false);
+            SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
+        }
+    }
+
+    private void StartDictation()
+    {
+        if (_currentRun is not null || _dictationRun is not null)
+        {
+            SetStatus(Tr("DictationBusy"), Tr("DictationBusyDetail"), "#F9C74F", busy: true);
+            return;
+        }
+
+        try
+        {
+            EnsureApiKeyReady();
+            _dictationTarget = _dictationTextInsertionService.CaptureTarget();
+            _dictationRun = new CancellationTokenSource();
+            _dictationRecorderService.Start();
+            _floatingButtonWindow?.SetDictationState(recording: true, processing: false);
+            _diagnosticsLog.Info(
+                "Dictation target captured",
+                $"process={_dictationTarget.ProcessName}, pasteAttempt={_dictationTarget.ShouldAttemptPaste}, " +
+                $"verified={_dictationTarget.HasVerifiedEditableFocus}, focus={_dictationTarget.FocusDescription}");
+            SetStatus(
+                Tr("DictationListening"),
+                _dictationTarget.ShouldAttemptPaste ? Tr("DictationListeningInsertDetail") : Tr("DictationListeningClipboardDetail"),
+                "#37D0F4",
+                busy: true);
+        }
+        catch (Exception ex)
+        {
+            _dictationRun?.Dispose();
+            _dictationRun = null;
+            _dictationTarget = null;
+            _floatingButtonWindow?.SetDictationState(recording: false, processing: false);
+            SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
+        }
+    }
+
+    private async Task StopDictationAsync()
+    {
+        if (!_dictationRecorderService.IsRecording || _dictationRun is null || _isDictationProcessing)
+        {
+            return;
+        }
+
+        var run = _dictationRun;
+        _isDictationProcessing = true;
+        _floatingButtonWindow?.SetDictationState(recording: false, processing: true);
+        SetStatus(Tr("DictationTranscribing"), Tr("DictationTranscribingDetail"), "#37D0F4", busy: true);
+
+        try
+        {
+            var audio = await _dictationRecorderService.StopAsync(run.Token);
+            var language = TranscriptionLanguageOption.All
+                .First(option => string.Equals(option.Id, _appSettings.TranscriptionLanguage, StringComparison.Ordinal))
+                .ApiLanguage;
+            var text = await _transcriptionClient.TranscribeAsync(
+                audio,
+                _appSettings.TranscriptionModel,
+                language,
+                run.Token);
+            var target = _dictationTarget ?? new DictationTarget(IntPtr.Zero, null, false, false, string.Empty, "unavailable");
+            var delivery = await _dictationTextInsertionService.DeliverAsync(
+                target,
+                text,
+                _appSettings.InsertDictationAutomatically,
+                _appSettings.RestoreClipboardAfterDictation,
+                run.Token);
+
+            _diagnosticsLog.Info(
+                "Dictation completed",
+                $"model={_appSettings.TranscriptionModel}, language={_appSettings.TranscriptionLanguage}, delivery={delivery}");
+            if (delivery == DictationDeliveryResult.Inserted)
+            {
+                SetStatus(Tr("DictationInserted"), Tr("DictationInsertedDetail"), "#41D6A1", busy: false);
+            }
+            else if (delivery == DictationDeliveryResult.PasteAttempted)
+            {
+                SetStatus(Tr("DictationPasteAttempted"), Tr("DictationPasteAttemptedDetail"), "#41D6A1", busy: false);
+            }
+            else
+            {
+                SetStatus(Tr("DictationCopied"), Tr("DictationCopiedDetail"), "#41D6A1", busy: false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus(Tr("DictationCanceled"), Tr("DictationCanceledDetail"), "#F9C74F", busy: false);
+        }
+        catch (Exception ex)
+        {
+            _diagnosticsLog.Error("Dictation failed", ex);
+            SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
+        }
+        finally
+        {
+            _isDictationProcessing = false;
+            _dictationTarget = null;
+            _dictationRun = null;
+            run.Dispose();
+            _floatingButtonWindow?.SetDictationState(recording: false, processing: false);
+            SetBusy(false);
         }
     }
     private async Task StartActiveVoiceInputAsync()
@@ -1144,6 +1359,12 @@ public partial class MainWindow : Window
     private bool TryStartRun(out CancellationToken cancellationToken)
     {
         cancellationToken = CancellationToken.None;
+        if (_dictationRecorderService.IsRecording || _isDictationProcessing)
+        {
+            SetStatus(Tr("DictationBusy"), Tr("DictationBusyDetail"), "#F9C74F", busy: true);
+            return false;
+        }
+
         if (_currentRun is not null)
         {
             SetStatus("Озвучиваю", "Дождись завершения или нажми Стоп.", "#F9C74F", busy: true);
@@ -1167,6 +1388,18 @@ public partial class MainWindow : Window
 
     private void StopCurrentRun()
     {
+        if (_dictationRecorderService.IsRecording)
+        {
+            _ = StopDictationAsync();
+            return;
+        }
+
+        if (_isDictationProcessing)
+        {
+            _dictationRun?.Cancel();
+            return;
+        }
+
         if (_currentRun is null)
         {
             _audioPlaybackService.StopAndCollapse();
@@ -1183,6 +1416,8 @@ public partial class MainWindow : Window
     private void CancelCurrentRun()
     {
         _playbackStopped = false;
+        _dictationRun?.Cancel();
+        _dictationRecorderService.Cancel();
         _currentRun?.Cancel();
         _audioPlaybackService.Cancel();
     }
@@ -1218,6 +1453,10 @@ public partial class MainWindow : Window
         SpeakButton.IsEnabled = !busy;
         ClipboardButton.IsEnabled = !busy;
         PreviewVoiceButton.IsEnabled = !busy;
+        TranscriptionModelComboBox.IsEnabled = !busy;
+        TranscriptionLanguageComboBox.IsEnabled = !busy;
+        InsertDictationToggle.IsEnabled = !busy;
+        RestoreDictationClipboardToggle.IsEnabled = !busy;
         TestCodexWindowButton.IsEnabled = !busy;
         TestCopyButton.IsEnabled = !busy;
         TestMicrophoneButton.IsEnabled = !busy;
@@ -1236,6 +1475,7 @@ public partial class MainWindow : Window
     {
         SetAutomationName(GeneralNavButton, GeneralNavText.Text);
         SetAutomationName(SpeechNavButton, SpeechNavText.Text);
+        SetAutomationName(DictationNavButton, DictationNavText.Text);
         SetAutomationName(HotkeysNavButton, HotkeysNavText.Text);
         SetAutomationName(IntegrationNavButton, IntegrationNavText.Text);
 
@@ -1265,6 +1505,11 @@ public partial class MainWindow : Window
         SetAutomationName(CollapseStructuredDataToggle, CollapseStructuredDataLabelText.Text, CollapseStructuredDataHintText.Text);
         SetAutomationName(ShortenShellCommandsToggle, ShortenShellCommandsLabelText.Text, ShortenShellCommandsHintText.Text);
         SetAutomationName(HideLongNumbersToggle, HideLongNumbersLabelText.Text, HideLongNumbersHintText.Text);
+
+        SetAutomationName(TranscriptionModelComboBox, TranscriptionModelLabelText.Text, TranscriptionModelHintText.Text);
+        SetAutomationName(TranscriptionLanguageComboBox, TranscriptionLanguageLabelText.Text, TranscriptionLanguageHintText.Text);
+        SetAutomationName(InsertDictationToggle, InsertDictationLabelText.Text, InsertDictationHintText.Text);
+        SetAutomationName(RestoreDictationClipboardToggle, RestoreDictationClipboardLabelText.Text, RestoreDictationClipboardHintText.Text);
 
         SetAutomationName(SpeakLatestHotkeyButton, SpeakHotkeyLabelText.Text, SpeakHotkeyHintText.Text);
         SetAutomationName(ClipboardHotkeyButton, ClipboardHotkeyLabelText.Text, ClipboardHotkeyHintText.Text);
@@ -1345,6 +1590,8 @@ public partial class MainWindow : Window
             _appSettings,
             SaveFloatingButtonPosition);
         _floatingButtonWindow.SetPlaybackSnapshot(_audioPlaybackService.CurrentSnapshot);
+        _floatingButtonWindow.SetDictationState(_dictationRecorderService.IsRecording, _isDictationProcessing);
+        ApplyFloatingButtonLocalization();
         _floatingButtonWindow.Show();
     }
 
@@ -1417,4 +1664,6 @@ public partial class MainWindow : Window
         _floatingButtonWindow = null;
         Close();
     }
+
+    private sealed record LocalizedOption(string Id, string Label);
 }

@@ -6,6 +6,13 @@ namespace VoiceButton.Services;
 
 public sealed class CodexWindowFinder(AppSettings? settings = null)
 {
+    public CodexWindow? FindForegroundWindow()
+    {
+        var foregroundWindow = NativeMethods.GetForegroundWindow();
+        var candidate = FindBestWindow();
+        return candidate?.Handle == foregroundWindow ? candidate : null;
+    }
+
     public CodexWindow? FindBestWindow(AssistantAppKind? preferredApp = null)
     {
         var currentProcessId = Environment.ProcessId;

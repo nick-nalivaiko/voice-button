@@ -29,6 +29,13 @@ public partial class FloatingButtonWindow : Window
     private PlaybackSnapshot _playbackSnapshot = PlaybackSnapshot.Inactive;
     private bool _isPlaybackActive;
     private bool _isSeeking;
+    private bool _dictationRecording;
+    private bool _dictationProcessing;
+    private string _compactTooltip = "Микрофон активного приложения / озвучить последний ответ";
+    private string _recordingTooltip = "Остановить запись и вставить текст";
+    private string _processingTooltip = "Распознаю речь";
+    private string _pausedPlaybackTooltip = "Продолжить / перемотка / стоп";
+    private string _playingPlaybackTooltip = "Пауза / перемотка / стоп";
     private double _compactLeft;
     private double _compactTop;
 
@@ -136,7 +143,10 @@ public partial class FloatingButtonWindow : Window
 
         if (clickPoint.X <= ControlZoneWidth)
         {
-            _startVoiceInput();
+            if (!_dictationProcessing)
+            {
+                _startVoiceInput();
+            }
         }
         else
         {
@@ -183,6 +193,40 @@ public partial class FloatingButtonWindow : Window
         }
     }
 
+    public void SetDictationState(bool recording, bool processing)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => SetDictationState(recording, processing));
+            return;
+        }
+
+        _dictationRecording = recording;
+        _dictationProcessing = processing;
+        if (IsLoaded)
+        {
+            ApplyPlaybackVisual();
+        }
+    }
+
+    public void SetLocalizedTooltips(
+        string compact,
+        string recording,
+        string processing,
+        string pausedPlayback,
+        string playingPlayback)
+    {
+        _compactTooltip = compact;
+        _recordingTooltip = recording;
+        _processingTooltip = processing;
+        _pausedPlaybackTooltip = pausedPlayback;
+        _playingPlaybackTooltip = playingPlayback;
+        if (IsLoaded)
+        {
+            ApplyPlaybackVisual();
+        }
+    }
+
     private void ApplyPlaybackVisual()
     {
         var active = _playbackSnapshot.IsActive;
@@ -194,6 +238,13 @@ public partial class FloatingButtonWindow : Window
 
         CompactGrid.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
         PlayerGrid.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        CompactMicrophoneGlyph.Visibility = !active && !_dictationRecording
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CompactMicrophoneGlyph.Opacity = _dictationProcessing ? 0.38 : 1;
+        CompactRecordingGlyph.Visibility = !active && _dictationRecording
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         PauseGlyph.Visibility = active && !_playbackSnapshot.IsPaused
             ? Visibility.Visible
@@ -205,8 +256,13 @@ public partial class FloatingButtonWindow : Window
         PlayedWaveformClip.Width = PlayedWaveformWidth * _playbackSnapshot.Progress;
         PlaybackTimeText.Text = FormatTime(_playbackSnapshot.Position);
         ButtonShell.ToolTip = active
-            ? (_playbackSnapshot.IsPaused ? "Продолжить / перемотка / стоп" : "Пауза / перемотка / стоп")
-            : "Микрофон активного приложения / озвучить последний ответ";
+            ? (_playbackSnapshot.IsPaused ? _pausedPlaybackTooltip : _playingPlaybackTooltip)
+            : _dictationRecording
+                ? _recordingTooltip
+                : _dictationProcessing
+                    ? _processingTooltip
+                    : _compactTooltip;
+        System.Windows.Automation.AutomationProperties.SetName(ButtonShell, ButtonShell.ToolTip?.ToString() ?? string.Empty);
     }
 
     private void ResizeForPlayback(bool active)

@@ -31,6 +31,25 @@ public sealed class ClipboardService
         }
     }
 
+    public async Task SetTextAsync(string text, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                WpfClipboard.SetText(text, WpfTextDataFormat.UnicodeText);
+                return;
+            }
+            catch when (attempt < 5)
+            {
+                await Task.Delay(60, cancellationToken);
+            }
+        }
+
+        throw new InvalidOperationException("Не удалось записать текст в буфер обмена.");
+    }
+
     public async Task<string> WaitForChangedTextAsync(uint previousSequence, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + timeout;

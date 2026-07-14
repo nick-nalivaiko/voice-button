@@ -2,7 +2,7 @@ namespace VoiceButton.Models;
 
 public sealed class AppSettings
 {
-    public string InterfaceLanguage { get; set; } = "ru";
+    public string InterfaceLanguage { get; set; } = string.Empty;
 
     public string SpeechModel { get; set; } = "gpt-4o-mini-tts";
 
@@ -15,6 +15,14 @@ public sealed class AppSettings
     public string SpeakClipboardHotkey { get; set; } = string.Empty;
 
     public string CodexMicHotkey { get; set; } = string.Empty;
+
+    public string TranscriptionModel { get; set; } = "gpt-4o-transcribe";
+
+    public string TranscriptionLanguage { get; set; } = "auto";
+
+    public bool InsertDictationAutomatically { get; set; } = true;
+
+    public bool RestoreClipboardAfterDictation { get; set; } = true;
 
     public string CodexWindowKeywords { get; set; } = "Codex";
 

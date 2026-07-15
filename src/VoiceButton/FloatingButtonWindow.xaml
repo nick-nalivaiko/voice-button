@@ -20,8 +20,8 @@
             BorderBrush="#2B8DFF"
             BorderThickness="1.2"
             Cursor="Hand"
-            ToolTip="Микрофон активного приложения / озвучить последний ответ"
-            AutomationProperties.Name="Voice Button: микрофон активного приложения слева, озвучка справа"
+            ToolTip="Микрофон / новый ответ; ПКМ по динамику: озвучить clipboard"
+            AutomationProperties.Name="Voice Button: микрофон слева, новый ответ справа; ПКМ по динамику озвучивает clipboard"
             MouseLeftButtonDown="ButtonShell_MouseLeftButtonDown"
             MouseLeftButtonUp="ButtonShell_MouseLeftButtonUp"
             MouseMove="ButtonShell_MouseMove">
@@ -38,6 +38,8 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="43" />
                     <ColumnDefinition Width="1" />
+                    <ColumnDefinition x:Name="CompactResumeColumn" Width="0" />
+                    <ColumnDefinition x:Name="CompactResumeDividerColumn" Width="0" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
@@ -70,9 +72,27 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="1" Width="1" Background="#2B8DFF" Opacity="0.58" />
+                <Border Grid.Column="1" Width="1" Background="#2B8DFF" Opacity="0.48" />
 
-                <Border Grid.Column="2" CornerRadius="0,18,18,0">
+                <Border x:Name="CompactResumeZone" Grid.Column="2" Background="#071528" Visibility="Collapsed">
+                    <StackPanel x:Name="CompactResumeContent"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Border Width="3" Height="9" CornerRadius="2" Background="#2B8DFF" Margin="1.2,0" />
+                        <Border Width="3" Height="17" CornerRadius="2" Background="#24A3FF" Margin="1.2,0" />
+                        <Border Width="3" Height="25" CornerRadius="2" Background="#37D0F4" Margin="1.2,0" />
+                        <Border Width="3" Height="30" CornerRadius="2" Background="#2B8DFF" Margin="1.2,0" />
+                        <Border Width="3" Height="21" CornerRadius="2" Background="#37D0F4" Margin="1.2,0" />
+                        <Border Width="3" Height="13" CornerRadius="2" Background="#24A3FF" Margin="1.2,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="CompactResumeDivider" Grid.Column="3" Width="1" Background="#2B8DFF" Opacity="0.48" Visibility="Collapsed" />
+
+                <Border Grid.Column="4"
+                        CornerRadius="0,18,18,0"
+                        MouseRightButtonDown="CompactSpeakerZone_MouseRightButtonDown">
                     <Border.Background>
                         <RadialGradientBrush GradientOrigin="0.42,0.25" Center="0.46,0.48" RadiusX="0.86" RadiusY="0.9">
                             <GradientStop Color="#123B72" Offset="0" />
@@ -80,19 +100,42 @@
                             <GradientStop Color="#010711" Offset="1" />
                         </RadialGradientBrush>
                     </Border.Background>
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                        <Border Width="3" Height="10" CornerRadius="2" Background="#2B8DFF" Margin="1.4,0" />
-                        <Border Width="3" Height="17" CornerRadius="2" Background="#24A3FF" Margin="1.4,0" />
-                        <Border Width="3" Height="26" CornerRadius="2" Background="#37D0F4" Margin="1.4,0" />
-                        <Border Width="3" Height="31" CornerRadius="2" Background="#2B8DFF" Margin="1.4,0" />
-                        <Border Width="3" Height="22" CornerRadius="2" Background="#37D0F4" Margin="1.4,0" />
-                        <Border Width="3" Height="14" CornerRadius="2" Background="#24A3FF" Margin="1.4,0" />
-                    </StackPanel>
+                    <Grid x:Name="CompactSpeakerContent"
+                          Width="25"
+                          Height="25"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Path Fill="#37D0F4"
+                              Data="M 3 9 L 8 9 L 13 5 L 13 19 L 8 15 L 3 15 Z"
+                              Stretch="Uniform"
+                              Width="13"
+                              Height="16"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center" />
+                        <Path Stroke="#24A3FF"
+                              StrokeThickness="2"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Data="M 15.5 8.5 C 18.5 10.5 18.5 13.5 15.5 15.5"
+                              Stretch="Uniform"
+                              Width="5"
+                              Height="9"
+                              Margin="13,0,0,0"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center" />
+                        <Path Stroke="#2B8DFF"
+                              StrokeThickness="1.8"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Data="M 18 5.5 C 23 9 23 15 18 18.5"
+                              Stretch="Uniform"
+                              Width="7"
+                              Height="14"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center" />
+                    </Grid>
                 </Border>
             </Grid>
-
             <Grid x:Name="PlayerGrid" Visibility="Collapsed">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="43" />

@@ -10,7 +10,9 @@ namespace VoiceButton;
 
 public partial class FloatingButtonWindow : Window
 {
-    private const double CompactWidth = 92;
+    private const double IdleCompactWidth = 92;
+    private const double ResumeCompactWidth = 136;
+    private const double ResumeZoneWidth = 48;
     private const double PlayerWidth = 274;
     private const double EdgePadding = 18;
     private const double ControlZoneWidth = 43;
@@ -18,8 +20,10 @@ public partial class FloatingButtonWindow : Window
     private const double SeekZoneWidth = 186;
     private const double PlayedWaveformWidth = 135;
 
-    private readonly Action _speak;
     private readonly Action _startVoiceInput;
+    private readonly Action _resumePlayback;
+    private readonly Action _speakLatest;
+    private readonly Action _speakClipboard;
     private readonly Action _togglePause;
     private readonly Action<double> _seek;
     private readonly Action _stop;
@@ -31,17 +35,21 @@ public partial class FloatingButtonWindow : Window
     private bool _isSeeking;
     private bool _dictationRecording;
     private bool _dictationProcessing;
-    private string _compactTooltip = "Микрофон активного приложения / озвучить последний ответ";
+    private bool _canResumePlayback;
+    private string _compactIdleTooltip = "Микрофон / новый ответ; ПКМ по динамику: озвучить clipboard";
+    private string _compactResumeTooltip = "Микрофон / продолжить аудио / новый ответ; ПКМ по динамику: clipboard";
     private string _recordingTooltip = "Остановить запись и вставить текст";
     private string _processingTooltip = "Распознаю речь";
     private string _pausedPlaybackTooltip = "Продолжить / перемотка / стоп";
     private string _playingPlaybackTooltip = "Пауза / перемотка / стоп";
-    private double _compactLeft;
+    private double _compactRight;
     private double _compactTop;
 
     public FloatingButtonWindow(
-        Action speak,
         Action startVoiceInput,
+        Action resumePlayback,
+        Action speakLatest,
+        Action speakClipboard,
         Action togglePause,
         Action<double> seek,
         Action stop,
@@ -49,8 +57,10 @@ public partial class FloatingButtonWindow : Window
         Action<double, double> savePosition)
     {
         InitializeComponent();
-        _speak = speak;
         _startVoiceInput = startVoiceInput;
+        _resumePlayback = resumePlayback;
+        _speakLatest = speakLatest;
+        _speakClipboard = speakClipboard;
         _togglePause = togglePause;
         _seek = seek;
         _stop = stop;
@@ -133,7 +143,8 @@ public partial class FloatingButtonWindow : Window
         }
 
         ClampToWorkArea();
-        _savePosition(Left, Top);
+        UpdateCompactAnchor();
+        _savePosition(_compactRight - IdleCompactWidth, _compactTop);
 
         var moved = Math.Abs(Left - startLeft) > 3 || Math.Abs(Top - startTop) > 3;
         if (moved)
@@ -148,9 +159,16 @@ public partial class FloatingButtonWindow : Window
                 _startVoiceInput();
             }
         }
-        else
+        else if (!_canResumePlayback || clickPoint.X >= Width - ControlZoneWidth)
         {
-            _speak();
+            if (!_dictationRecording && !_dictationProcessing)
+            {
+                _speakLatest();
+            }
+        }
+        else if (!_dictationRecording && !_dictationProcessing)
+        {
+            _resumePlayback();
         }
     }
 
@@ -165,6 +183,16 @@ public partial class FloatingButtonWindow : Window
         e.Handled = true;
     }
 
+    private void CompactSpeakerZone_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (_isPlaybackActive || _dictationRecording || _dictationProcessing)
+        {
+            return;
+        }
+
+        _speakClipboard();
+    }
     private void ButtonShell_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_isSeeking)
@@ -209,14 +237,41 @@ public partial class FloatingButtonWindow : Window
         }
     }
 
+    public void SetResumeAvailable(bool available)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => SetResumeAvailable(available));
+            return;
+        }
+
+        if (_canResumePlayback == available)
+        {
+            return;
+        }
+
+        _canResumePlayback = available;
+        if (IsLoaded)
+        {
+            if (!_isPlaybackActive)
+            {
+                ResizeCompactForResumeAvailability();
+            }
+
+            ApplyPlaybackVisual();
+        }
+    }
+
     public void SetLocalizedTooltips(
-        string compact,
+        string compactIdle,
+        string compactResume,
         string recording,
         string processing,
         string pausedPlayback,
         string playingPlayback)
     {
-        _compactTooltip = compact;
+        _compactIdleTooltip = compactIdle;
+        _compactResumeTooltip = compactResume;
         _recordingTooltip = recording;
         _processingTooltip = processing;
         _pausedPlaybackTooltip = pausedPlayback;
@@ -245,6 +300,12 @@ public partial class FloatingButtonWindow : Window
         CompactRecordingGlyph.Visibility = !active && _dictationRecording
             ? Visibility.Visible
             : Visibility.Collapsed;
+        CompactResumeColumn.Width = new GridLength(_canResumePlayback ? ResumeZoneWidth : 0);
+        CompactResumeDividerColumn.Width = new GridLength(_canResumePlayback ? DividerWidth : 0);
+        CompactResumeZone.Visibility = _canResumePlayback ? Visibility.Visible : Visibility.Collapsed;
+        CompactResumeDivider.Visibility = _canResumePlayback ? Visibility.Visible : Visibility.Collapsed;
+        CompactResumeContent.Opacity = !_dictationRecording && !_dictationProcessing ? 1 : 0.32;
+        CompactSpeakerContent.Opacity = !_dictationRecording && !_dictationProcessing ? 1 : 0.32;
 
         PauseGlyph.Visibility = active && !_playbackSnapshot.IsPaused
             ? Visibility.Visible
@@ -261,7 +322,9 @@ public partial class FloatingButtonWindow : Window
                 ? _recordingTooltip
                 : _dictationProcessing
                     ? _processingTooltip
-                    : _compactTooltip;
+                    : _canResumePlayback
+                        ? _compactResumeTooltip
+                        : _compactIdleTooltip;
         System.Windows.Automation.AutomationProperties.SetName(ButtonShell, ButtonShell.ToolTip?.ToString() ?? string.Empty);
     }
 
@@ -269,23 +332,40 @@ public partial class FloatingButtonWindow : Window
     {
         if (active)
         {
-            _compactLeft = Left;
-            _compactTop = Top;
+            UpdateCompactAnchor();
             Width = PlayerWidth;
-            Left = _compactLeft - (PlayerWidth - CompactWidth);
+            Left = _compactRight - PlayerWidth;
             Top = _compactTop;
         }
         else
         {
-            Width = CompactWidth;
-            Left = _compactLeft;
+            Width = CurrentCompactWidth;
+            Left = _compactRight - Width;
             Top = _compactTop;
             _isSeeking = false;
             ButtonShell.ReleaseMouseCapture();
         }
 
         ClampToWorkArea();
+        UpdateCompactAnchor();
     }
+
+    private void ResizeCompactForResumeAvailability()
+    {
+        var right = Left + Width;
+        Width = CurrentCompactWidth;
+        Left = right - Width;
+        ClampToWorkArea();
+        UpdateCompactAnchor();
+    }
+
+    private void UpdateCompactAnchor()
+    {
+        _compactRight = Left + Width;
+        _compactTop = Top;
+    }
+
+    private double CurrentCompactWidth => _canResumePlayback ? ResumeCompactWidth : IdleCompactWidth;
 
     private void SeekFromPoint(double x)
     {
@@ -297,12 +377,12 @@ public partial class FloatingButtonWindow : Window
     private void ApplyInitialPosition()
     {
         var workArea = SystemParameters.WorkArea;
-        Width = CompactWidth;
-        Left = _settings.FloatingButtonLeft ?? workArea.Right - CompactWidth - 24;
+        Width = CurrentCompactWidth;
+        var idleLeft = _settings.FloatingButtonLeft ?? workArea.Right - IdleCompactWidth - 24;
+        Left = idleLeft + IdleCompactWidth - Width;
         Top = _settings.FloatingButtonTop ?? workArea.Bottom - Height - 24;
         ClampToWorkArea();
-        _compactLeft = Left;
-        _compactTop = Top;
+        UpdateCompactAnchor();
     }
 
     private void ClampToWorkArea()

@@ -16,6 +16,8 @@ internal sealed class CapturingReadStream(Stream inner) : Stream
         set => throw new NotSupportedException();
     }
 
+    public bool IsComplete { get; private set; }
+
     public byte[] ToArray() => _captured.ToArray();
 
     public override int Read(byte[] buffer, int offset, int count)
@@ -24,6 +26,10 @@ internal sealed class CapturingReadStream(Stream inner) : Stream
         if (read > 0)
         {
             _captured.Write(buffer, offset, read);
+        }
+        else
+        {
+            IsComplete = true;
         }
 
         return read;
@@ -36,6 +42,10 @@ internal sealed class CapturingReadStream(Stream inner) : Stream
         {
             _captured.Write(buffer[..read]);
         }
+        else
+        {
+            IsComplete = true;
+        }
 
         return read;
     }
@@ -46,6 +56,10 @@ internal sealed class CapturingReadStream(Stream inner) : Stream
         if (value >= 0)
         {
             _captured.WriteByte((byte)value);
+        }
+        else
+        {
+            IsComplete = true;
         }
 
         return value;

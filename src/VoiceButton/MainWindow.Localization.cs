@@ -22,9 +22,9 @@ public partial class MainWindow
         ["InterfaceLanguageLabel"] = new[] { "Язык интерфейса", "Мова інтерфейсу", "Interface language" },
         ["InterfaceLanguageHint"] = new[] { "Переводит основные элементы окна настроек.", "Перекладає основні елементи вікна налаштувань.", "Translates the main settings window controls." },
         ["FloatingButtonLabel"] = new[] { "Показывать плавающую кнопку", "Показувати плаваючу кнопку", "Show floating button" },
-        ["FloatingButtonHint"] = new[] { "Маленькая кнопка над часами: микрофон слева, озвучка справа.", "Маленька кнопка над годинником: мікрофон зліва, озвучення справа.", "Small button above the clock: microphone on the left, speech on the right." },
-        ["MinimizeToTrayLabel"] = new[] { "Сворачивать в трей", "Згортати в трей", "Minimize to tray" },
-        ["MinimizeToTrayHint"] = new[] { "Крестик и кнопка свернуть прячут окно, приложение остается под рукой.", "Хрестик і кнопка згортання ховають вікно, програма лишається під рукою.", "Close and minimize hide the window while the app keeps running." },
+        ["FloatingButtonHint"] = new[] { "Микрофон слева, новый ответ справа; ПКМ по динамику озвучивает clipboard. Волна появляется для сохраненного аудио.", "Мікрофон ліворуч, нова відповідь праворуч; ПКМ по динаміку озвучує clipboard. Хвиля з'являється для збереженого аудіо.", "Microphone on the left, new answer on the right; right-click the speaker to speak the clipboard. The waveform appears for saved audio." },
+        ["MinimizeToTrayLabel"] = new[] { "Закрывать в трей", "Закривати в трей", "Close to tray" },
+        ["MinimizeToTrayHint"] = new[] { "Если включено, крестик прячет окно в трей. Верхняя кнопка всегда сворачивает его в панель задач.", "Якщо ввімкнено, хрестик ховає вікно в трей. Верхня кнопка завжди згортає його на панель завдань.", "When enabled, Close hides the window in the tray. The top Minimize button always sends it to the taskbar." },
         ["StartWithWindowsLabel"] = new[] { "Запускать вместе с Windows", "Запускати разом із Windows", "Start with Windows" },
         ["StartWithWindowsHint"] = new[] { "Добавляет Voice Button в автозапуск текущего пользователя Windows.", "Додає Voice Button в автозапуск поточного користувача Windows.", "Adds Voice Button to the current Windows user's startup apps." },
         ["RememberFloatingPositionLabel"] = new[] { "Запоминать позицию кнопки", "Запам'ятовувати позицію кнопки", "Remember button position" },
@@ -69,7 +69,8 @@ public partial class MainWindow
         ["DictationCopiedDetail"] = new[] { "Поле ввода не найдено. Текст можно вставить вручную.", "Поле вводу не знайдено. Текст можна вставити вручну.", "No input field was found. Paste the text manually." },
         ["DictationCanceled"] = new[] { "Диктовка остановлена", "Диктування зупинено", "Dictation stopped" },
         ["DictationCanceledDetail"] = new[] { "Запись или распознавание отменено.", "Запис або розпізнавання скасовано.", "Recording or transcription was canceled." },
-        ["FloatingMicTooltip"] = new[] { "Микрофон приложения или диктовка / озвучить последний ответ", "Мікрофон програми або диктування / озвучити останню відповідь", "App microphone or dictation / speak latest answer" },
+        ["FloatingMicTooltip"] = new[] { "Микрофон / новый ответ; ПКМ по динамику: озвучить clipboard", "Мікрофон / нова відповідь; ПКМ по динаміку: озвучити clipboard", "Microphone / new answer; right-click speaker: speak clipboard" },
+        ["FloatingResumeTooltip"] = new[] { "Микрофон / продолжить аудио / новый ответ; ПКМ по динамику: clipboard", "Мікрофон / продовжити аудіо / нова відповідь; ПКМ по динаміку: clipboard", "Microphone / resume audio / new answer; right-click speaker: clipboard" },
         ["FloatingRecordingTooltip"] = new[] { "Остановить запись и вставить текст", "Зупинити запис і вставити текст", "Stop recording and insert text" },
         ["FloatingProcessingTooltip"] = new[] { "Распознаю речь", "Розпізнаю мовлення", "Transcribing speech" },
         ["FloatingPauseTooltip"] = new[] { "Продолжить / перемотка / стоп", "Продовжити / перемотування / стоп", "Resume / seek / stop" },
@@ -167,7 +168,7 @@ public partial class MainWindow
         ["CodexWindowKeywordsSaved"] = new[] { "Ключевые слова сохранены", "Ключові слова збережено", "Window keywords saved" },
         ["StopButton"] = new[] { "Стоп", "Стоп", "Stop" },
         ["ClipboardButton"] = new[] { "Озвучить clipboard", "Озвучити clipboard", "Speak clipboard" },
-        ["CancelButton"] = new[] { "Свернуть", "Згорнути", "Minimize" },
+        ["MinimizeToTrayButton"] = new[] { "Свернуть в трей", "Згорнути в трей", "Minimize to tray" },
         ["SpeakButton"] = new[] { "Озвучить последний ответ", "Озвучити останню відповідь", "Speak latest answer" },
         ["AccentHint"] = new[] { "Автосохранение включено.", "Автозбереження увімкнено.", "Auto-save is on." },
         ["Ready"] = new[] { "Готово", "Готово", "Ready" },
@@ -301,7 +302,7 @@ public partial class MainWindow
         TestMicrophoneButton.Content = Tr("FindMicrophoneButton");
         StopButton.Content = Tr("StopButton");
         ClipboardButton.Content = Tr("ClipboardButton");
-        CancelButton.Content = Tr("CancelButton");
+        TrayMinimizeButton.Content = Tr("MinimizeToTrayButton");
         SpeakButton.Content = Tr("SpeakButton");
         AccentHintText.Text = Tr("AccentHint");
         UpdateHeaderTitle();
@@ -326,6 +327,7 @@ public partial class MainWindow
     {
         _floatingButtonWindow?.SetLocalizedTooltips(
             Tr("FloatingMicTooltip"),
+            Tr("FloatingResumeTooltip"),
             Tr("FloatingRecordingTooltip"),
             Tr("FloatingProcessingTooltip"),
             Tr("FloatingPauseTooltip"),

@@ -37,11 +37,14 @@ public partial class MainWindow : Window
     private readonly DiagnosticsLogService _diagnosticsLog = new();
 
     private CancellationTokenSource? _currentRun;
+    private CancellationTokenSource? _latestCaptureRun;
     private readonly List<byte[]> _cachedAudioChunks = [];
     private string? _cachedSpeechText;
     private string? _cachedSpeechConfiguration;
     private int _cachedSpeechChunkCount;
     private bool _playbackStopped;
+    private bool _currentRunIsSpeech;
+    private bool _isReplacingLatest;
     private TrayIconService? _trayIconService;
     private FloatingButtonWindow? _floatingButtonWindow;
     private bool _exitRequested;
@@ -164,7 +167,7 @@ public partial class MainWindow : Window
     {
         _trayIconService = new TrayIconService(
             ShowFromTray,
-            () => _ = SpeakLatestOrResumeAsync(),
+            () => _ = SpeakLatestAnswerAsync(),
             StopCurrentRun,
             ExitApplication);
 
@@ -234,7 +237,7 @@ public partial class MainWindow : Window
 
     private void SpeakButton_Click(object sender, RoutedEventArgs e)
     {
-        _ = SpeakLatestOrResumeAsync();
+        _ = SpeakLatestAnswerAsync();
     }
 
     private void ClipboardButton_Click(object sender, RoutedEventArgs e)
@@ -252,15 +255,14 @@ public partial class MainWindow : Window
         StopCurrentRun();
     }
 
-    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    private void TaskbarMinimizeButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_appSettings.MinimizeToTray)
-        {
-            Hide();
-            return;
-        }
-
         WindowState = WindowState.Minimized;
+    }
+
+    private void MinimizeToTrayButton_Click(object sender, RoutedEventArgs e)
+    {
+        Hide();
     }
 
     private void MaximizeButton_Click(object sender, RoutedEventArgs e)
@@ -429,7 +431,7 @@ public partial class MainWindow : Window
         switch (actionId)
         {
             case SpeakLatestHotkeyId:
-                _ = SpeakLatestOrResumeAsync();
+                _ = SpeakLatestAnswerAsync();
                 break;
             case ClipboardHotkeyId:
                 _ = SpeakClipboardAsync();
@@ -571,7 +573,7 @@ public partial class MainWindow : Window
 
         _appSettings.MinimizeToTray = MinimizeToTrayToggle.IsChecked == true;
         _appSettingsStore.Save(_appSettings);
-        SetStatus("Общие настройки", _appSettings.MinimizeToTray ? "Окно будет сворачиваться в трей." : "Крестик будет закрывать приложение.", "#41D6A1", busy: false);
+        SetStatus("Общие настройки", _appSettings.MinimizeToTray ? "Крестик будет прятать окно в трей." : "Крестик будет закрывать приложение.", "#41D6A1", busy: false);
     }
 
     private void RememberFloatingButtonPositionToggle_Changed(object sender, RoutedEventArgs e)
@@ -1017,21 +1019,33 @@ public partial class MainWindow : Window
 
         return keywords.Length == 0 ? "Codex" : string.Join(", ", keywords);
     }
-    private async Task SpeakLatestOrResumeAsync()
+    private void ResumeSavedPlayback()
     {
-        if (_playbackStopped && _currentRun is not null)
+        if (!_playbackStopped || _currentRun is null)
         {
-            _playbackStopped = false;
-            var resumedPlayback = _audioPlaybackService.Resume();
+            _floatingButtonWindow?.SetResumeAvailable(false);
+            return;
+        }
+
+        var resumedPlayback = _audioPlaybackService.Resume();
+        if (!resumedPlayback)
+        {
             SetStatus(
-                resumedPlayback ? "Озвучиваю" : "Готовлю аудио",
-                resumedPlayback ? "Продолжаю с места остановки." : "Продолжаю текущую подготовку аудио.",
-                "#41D6A1",
+                "Готовлю аудио",
+                "Аудио еще не готово. Попробуй открыть плеер через волну чуть позже.",
+                "#37D0F4",
                 busy: true);
             return;
         }
 
-        await SpeakLatestAnswerAsync();
+        _playbackStopped = false;
+        _floatingButtonWindow?.SetResumeAvailable(false);
+        SetBusy(true);
+        SetStatus(
+            "Озвучиваю",
+            "Продолжаю с места остановки.",
+            "#41D6A1",
+            busy: true);
     }
 
     private async Task StartVoiceInputOrWhileStoppedAsync()
@@ -1072,7 +1086,7 @@ public partial class MainWindow : Window
 
     private void StartDictation()
     {
-        if (_currentRun is not null || _dictationRun is not null)
+        if ((_currentRun is not null && (!_playbackStopped || !_currentRunIsSpeech)) || _dictationRun is not null)
         {
             SetStatus(Tr("DictationBusy"), Tr("DictationBusyDetail"), "#F9C74F", busy: true);
             return;
@@ -1199,14 +1213,90 @@ public partial class MainWindow : Window
 
     private async Task SpeakLatestAnswerAsync()
     {
-        if (!TryStartRun(out var cancellationToken))
+        if (_isReplacingLatest)
+        {
+            return;
+        }
+
+        if (_dictationRecorderService.IsRecording || _isDictationProcessing)
+        {
+            SetStatus(Tr("DictationBusy"), Tr("DictationBusyDetail"), "#F9C74F", busy: true);
+            return;
+        }
+
+        if (_currentRun is not null && !_currentRunIsSpeech)
+        {
+            SetStatus("Занято", "Заверши текущее действие или нажми Стоп.", "#F9C74F", busy: true);
+            return;
+        }
+
+        _isReplacingLatest = true;
+        try
+        {
+            if (_currentRun is not null && _currentRunIsSpeech)
+            {
+                _playbackStopped = true;
+                _floatingButtonWindow?.SetResumeAvailable(true);
+                _audioPlaybackService.StopAndCollapse();
+                _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
+            }
+
+            using var captureRun = new CancellationTokenSource();
+            _latestCaptureRun = captureRun;
+            SetBusy(true);
+
+            string text;
+            try
+            {
+                text = await _codexCopyService.CopyLastAnswerAsync(SetCopyStatus, captureRun.Token);
+            }
+            finally
+            {
+                if (ReferenceEquals(_latestCaptureRun, captureRun))
+                {
+                    _latestCaptureRun = null;
+                }
+            }
+
+            await CancelCurrentSpeechRunAndWaitAsync();
+            _playbackStopped = false;
+            _floatingButtonWindow?.SetResumeAvailable(false);
+            _ = SpeakCapturedAnswerAsync(text);
+        }
+        catch (OperationCanceledException)
+        {
+            var detail = _playbackStopped && _currentRun is not null
+                ? "Новый ответ не запущен. Сохраненное аудио доступно через волну."
+                : "Озвучка прервана.";
+            SetStatus("Остановлено", detail, "#F9C74F", busy: false);
+        }
+        catch (Exception ex)
+        {
+            var detail = _playbackStopped && _currentRun is not null
+                ? $"{ex.Message} Сохраненное аудио осталось доступно через волну."
+                : ex.Message;
+            SetStatus("Ошибка", detail, "#F25F5C", busy: false);
+        }
+        finally
+        {
+            _latestCaptureRun = null;
+            _isReplacingLatest = false;
+            if (_currentRun is null || _playbackStopped)
+            {
+                SetBusy(false);
+            }
+        }
+    }
+
+    private async Task SpeakCapturedAnswerAsync(string text)
+    {
+        if (!TryStartRun(out var cancellationToken, isSpeech: true))
         {
             return;
         }
 
         try
         {
-            var text = await _codexCopyService.CopyLastAnswerAsync(SetCopyStatus, cancellationToken);
             await SpeakTextAsync(text, cancellationToken);
             SetReady();
         }
@@ -1224,9 +1314,92 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task CancelCurrentSpeechRunAndWaitAsync()
+    {
+        var run = _currentRun;
+        if (run is null)
+        {
+            return;
+        }
+
+        run.Cancel();
+        _audioPlaybackService.Cancel();
+
+        for (var attempt = 0; attempt < 250 && ReferenceEquals(_currentRun, run); attempt++)
+        {
+            await Task.Delay(20);
+        }
+
+        if (ReferenceEquals(_currentRun, run))
+        {
+            throw new TimeoutException("Не удалось завершить предыдущую озвучку.");
+        }
+    }
+
+    private async Task SpeakClipboardFromFloatingAsync()
+    {
+        if (_dictationRecorderService.IsRecording || _isDictationProcessing)
+        {
+            SetStatus(Tr("DictationBusy"), Tr("DictationBusyDetail"), "#F9C74F", busy: true);
+            return;
+        }
+
+        if (_isReplacingLatest)
+        {
+            return;
+        }
+
+        if (_currentRun is null)
+        {
+            await SpeakClipboardAsync();
+            return;
+        }
+
+        if (!_currentRunIsSpeech)
+        {
+            SetStatus("Занято", "Заверши текущее действие или нажми Стоп.", "#F9C74F", busy: true);
+            return;
+        }
+
+        _isReplacingLatest = true;
+        try
+        {
+            var text = _clipboardService.GetText();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                throw new InvalidOperationException("В clipboard нет текста для озвучки.");
+            }
+
+            await CancelCurrentSpeechRunAndWaitAsync();
+            _playbackStopped = false;
+            _floatingButtonWindow?.SetResumeAvailable(false);
+            _ = SpeakCapturedAnswerAsync(text.Trim());
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Остановлено", "Озвучка clipboard отменена.", "#F9C74F", busy: false);
+        }
+        catch (Exception ex)
+        {
+            var hasSavedAudio = _playbackStopped && _currentRun is not null;
+            var detail = hasSavedAudio
+                ? $"{ex.Message} Сохраненное аудио осталось доступно через волну."
+                : ex.Message;
+            SetStatus("Ошибка", detail, "#F25F5C", busy: _currentRun is not null && !_playbackStopped);
+        }
+        finally
+        {
+            _isReplacingLatest = false;
+            if (_currentRun is null || _playbackStopped)
+            {
+                SetBusy(false);
+            }
+        }
+    }
+
     private async Task SpeakClipboardAsync()
     {
-        if (!TryStartRun(out var cancellationToken))
+        if (!TryStartRun(out var cancellationToken, isSpeech: true))
         {
             return;
         }
@@ -1258,7 +1431,7 @@ public partial class MainWindow : Window
 
     private async Task PreviewVoiceAsync()
     {
-        if (!TryStartRun(out var cancellationToken))
+        if (!TryStartRun(out var cancellationToken, isSpeech: true))
         {
             return;
         }
@@ -1332,13 +1505,21 @@ public partial class MainWindow : Window
 
             cancellationToken.ThrowIfCancellationRequested();
             SetStatus("Озвучиваю", $"{index + 1}/{chunks.Count}", "#41D6A1", busy: true);
-            await _audioPlaybackService.PlayStreamingAsync(
-                capturedAudio,
-                _settings.ResponseFormat,
-                cancellationToken,
-                startStopped: _playbackStopped);
-
-            _cachedAudioChunks.Add(capturedAudio.ToArray());
+            try
+            {
+                await _audioPlaybackService.PlayStreamingAsync(
+                    capturedAudio,
+                    _settings.ResponseFormat,
+                    cancellationToken,
+                    startStopped: _playbackStopped);
+            }
+            finally
+            {
+                if (capturedAudio.IsComplete && _cachedAudioChunks.Count == index)
+                {
+                    _cachedAudioChunks.Add(capturedAudio.ToArray());
+                }
+            }
         }
     }
     private async Task ReplayCachedAudioAsync(CancellationToken cancellationToken)
@@ -1356,7 +1537,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private bool TryStartRun(out CancellationToken cancellationToken)
+    private bool TryStartRun(out CancellationToken cancellationToken, bool isSpeech = false)
     {
         cancellationToken = CancellationToken.None;
         if (_dictationRecorderService.IsRecording || _isDictationProcessing)
@@ -1372,7 +1553,10 @@ public partial class MainWindow : Window
         }
 
         RefreshApiKeyStatus();
+        _playbackStopped = false;
+        _floatingButtonWindow?.SetResumeAvailable(false);
         _currentRun = new CancellationTokenSource();
+        _currentRunIsSpeech = isSpeech;
         cancellationToken = _currentRun.Token;
         SetBusy(true);
         return true;
@@ -1383,7 +1567,9 @@ public partial class MainWindow : Window
         _currentRun?.Dispose();
         _currentRun = null;
         _playbackStopped = false;
-        SetBusy(false);
+        _currentRunIsSpeech = false;
+        _floatingButtonWindow?.SetResumeAvailable(false);
+        SetBusy(_isReplacingLatest);
     }
 
     private void StopCurrentRun()
@@ -1400,26 +1586,48 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_latestCaptureRun is not null)
+        {
+            _latestCaptureRun.Cancel();
+            if (_currentRun is null)
+            {
+                SetStatus("Остановлено", "Поиск нового ответа отменен.", "#F9C74F", busy: false);
+                return;
+            }
+        }
+
         if (_currentRun is null)
         {
             _audioPlaybackService.StopAndCollapse();
             _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
+            _floatingButtonWindow?.SetResumeAvailable(false);
+            return;
+        }
+
+        if (!_currentRunIsSpeech)
+        {
+            _currentRun.Cancel();
+            SetStatus("Остановлено", "Текущее действие прервано.", "#F9C74F", busy: false);
             return;
         }
 
         _playbackStopped = true;
+        _floatingButtonWindow?.SetResumeAvailable(true);
         _audioPlaybackService.StopAndCollapse();
         _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
-        SetStatus("Остановлено", "Аудио сохранено. Нажми озвучку, чтобы продолжить.", "#F9C74F", busy: false);
+        SetBusy(false);
+        SetStatus("Остановлено", "Аудио сохранено. Нажми волну, чтобы продолжить.", "#F9C74F", busy: false);
     }
 
     private void CancelCurrentRun()
     {
         _playbackStopped = false;
+        _latestCaptureRun?.Cancel();
         _dictationRun?.Cancel();
         _dictationRecorderService.Cancel();
         _currentRun?.Cancel();
         _audioPlaybackService.Cancel();
+        _floatingButtonWindow?.SetResumeAvailable(false);
     }
 
     private void EnsureApiKeyReady()
@@ -1470,6 +1678,10 @@ public partial class MainWindow : Window
     private void AudioPlaybackService_PlaybackChanged(object? sender, PlaybackSnapshot snapshot)
     {
         _floatingButtonWindow?.SetPlaybackSnapshot(snapshot);
+        if (snapshot.IsActive)
+        {
+            _floatingButtonWindow?.SetResumeAvailable(false);
+        }
     }
     private void ApplyAccessibilityNames()
     {
@@ -1523,6 +1735,10 @@ public partial class MainWindow : Window
         SetAutomationName(RetryMicrophoneToggle, RetryMicrophoneLabelText.Text, RetryMicrophoneHintText.Text);
         SetAutomationName(TestCopyButton, TestCopyButton.Content?.ToString() ?? string.Empty, DiagnosticsHintText.Text);
         SetAutomationName(TestMicrophoneButton, TestMicrophoneButton.Content?.ToString() ?? string.Empty, DiagnosticsHintText.Text);
+        SetAutomationName(StopButton, StopButton.Content?.ToString() ?? string.Empty);
+        SetAutomationName(ClipboardButton, ClipboardButton.Content?.ToString() ?? string.Empty);
+        SetAutomationName(SpeakButton, SpeakButton.Content?.ToString() ?? string.Empty);
+        SetAutomationName(TrayMinimizeButton, TrayMinimizeButton.Content?.ToString() ?? string.Empty);
     }
 
     private static void SetAutomationName(FrameworkElement element, string name, string? helpText = null)
@@ -1582,14 +1798,17 @@ public partial class MainWindow : Window
         }
 
         _floatingButtonWindow = new FloatingButtonWindow(
-            () => _ = SpeakLatestOrResumeAsync(),
             () => _ = StartVoiceInputOrWhileStoppedAsync(),
+            ResumeSavedPlayback,
+            () => _ = SpeakLatestAnswerAsync(),
+            () => _ = SpeakClipboardFromFloatingAsync(),
             _audioPlaybackService.TogglePause,
             _audioPlaybackService.Seek,
             StopCurrentRun,
             _appSettings,
             SaveFloatingButtonPosition);
         _floatingButtonWindow.SetPlaybackSnapshot(_audioPlaybackService.CurrentSnapshot);
+        _floatingButtonWindow.SetResumeAvailable(_playbackStopped && _currentRun is not null);
         _floatingButtonWindow.SetDictationState(_dictationRecorderService.IsRecording, _isDictationProcessing);
         ApplyFloatingButtonLocalization();
         _floatingButtonWindow.Show();

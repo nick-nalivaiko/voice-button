@@ -540,7 +540,7 @@
                     </Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource WindowButton}" Content="&#xE921;" Margin="0,0,12,0" Click="MinimizeButton_Click" />
+                    <Button Style="{StaticResource WindowButton}" Content="&#xE921;" Margin="0,0,12,0" Click="TaskbarMinimizeButton_Click" />
                     <Button Style="{StaticResource WindowButton}" Content="&#xE922;" Margin="0,0,12,0" Click="MaximizeButton_Click" />
                     <Button Style="{StaticResource WindowButton}" Content="&#xE8BB;" Click="CloseButton_Click" />
                 </StackPanel>
@@ -600,7 +600,7 @@
                                 <TextBlock Style="{StaticResource RowIcon}" Text="&#xE7C4;" />
                                 <StackPanel Grid.Column="1">
                                     <TextBlock x:Name="FloatingButtonLabelText" Style="{StaticResource FieldLabel}" Text="Показывать плавающую кнопку" />
-                                    <TextBlock x:Name="FloatingButtonHintText" Style="{StaticResource FieldHint}" Text="Маленькая кнопка над часами: микрофон слева, озвучка справа." />
+                                    <TextBlock x:Name="FloatingButtonHintText" Style="{StaticResource FieldHint}" Text="Микрофон слева, новый ответ справа; ПКМ по динамику озвучивает clipboard. Волна появляется для сохраненного аудио." />
                                 </StackPanel>
                                 <ToggleButton x:Name="FloatingButtonToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="FloatingButtonToggle_Changed" Unchecked="FloatingButtonToggle_Changed" />
                             </Grid>
@@ -609,8 +609,8 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBlock Style="{StaticResource RowIcon}" Text="&#xE921;" />
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock x:Name="MinimizeToTrayLabelText" Style="{StaticResource FieldLabel}" Text="Сворачивать в трей" />
-                                    <TextBlock x:Name="MinimizeToTrayHintText" Style="{StaticResource FieldHint}" Text="Крестик и кнопка свернуть прячут окно, приложение остается под рукой." />
+                                    <TextBlock x:Name="MinimizeToTrayLabelText" Style="{StaticResource FieldLabel}" Text="Закрывать в трей" />
+                                    <TextBlock x:Name="MinimizeToTrayHintText" Style="{StaticResource FieldHint}" Text="Если включено, крестик прячет окно в трей. Верхняя кнопка всегда сворачивает его в панель задач." />
                                 </StackPanel>
                                 <ToggleButton x:Name="MinimizeToTrayToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="MinimizeToTrayToggle_Changed" Unchecked="MinimizeToTrayToggle_Changed" />
                             </Grid>
@@ -997,7 +997,20 @@
                 </ScrollViewer>
             </Grid>
 
-            <Border Grid.Row="2" BorderBrush="#1B2B40" BorderThickness="0,1,0,0"><Grid Margin="34,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"><Button x:Name="StopButton" Style="{StaticResource SecondaryButton}" Content="Стоп" Click="StopButton_Click" /><Button x:Name="ClipboardButton" Style="{StaticResource SecondaryButton}" Content="Озвучить clipboard" Margin="12,0,0,0" Click="ClipboardButton_Click" /></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button x:Name="CancelButton" Style="{StaticResource SecondaryButton}" Content="Свернуть" Margin="0,0,14,0" Click="MinimizeButton_Click" /><Button x:Name="SpeakButton" Style="{StaticResource PrimaryButton}" Content="Озвучить последний ответ" Click="SpeakButton_Click" /></StackPanel></Grid></Border>
+            <Border Grid.Row="2" BorderBrush="#1B2B40" BorderThickness="0,1,0,0">
+                <Grid Margin="34,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="StopButton" Style="{StaticResource SecondaryButton}" Content="Стоп" Click="StopButton_Click" />
+                        <Button x:Name="ClipboardButton" Style="{StaticResource SecondaryButton}" Content="Озвучить clipboard" Margin="12,0,0,0" Click="ClipboardButton_Click" />
+                        <Button x:Name="SpeakButton" Style="{StaticResource PrimaryButton}" Content="Озвучить последний ответ" Margin="12,0,0,0" Click="SpeakButton_Click" />
+                    </StackPanel>
+                    <Button x:Name="TrayMinimizeButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Свернуть в трей" Click="MinimizeToTrayButton_Click" />
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </Window>

@@ -14,7 +14,7 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **Latest answer only**: targets assistant Copy actions instead of reading the user's prompt.
 - **OpenAI text-to-speech**: model, voice, and playback speed are configurable.
 - **Buffered streaming playback**: starts once ten seconds are buffered (or a shorter clip is complete) and protects a four-second reserve during network slowdowns.
-- **Floating controls**: microphone on the left, speech on the right, and an expanding player during playback.
+- **Floating controls**: microphone on the left, latest-answer speech on the right, right-click speaker playback for the clipboard, and an expanding player during playback.
 - **Real playback controls**: pause/resume, waveform seeking, elapsed time, and stop.
 - **Universal dictation**: records speech, transcribes it with OpenAI, and inserts it into the focused input field or leaves it in the clipboard.
 - **Global hotkeys**: configurable shortcuts for the latest answer, clipboard speech, and context-aware microphone action.
@@ -27,15 +27,16 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 
 ## Floating controls
 
-The compact control stays out of the way until playback starts. During speech it expands into a 274 px player with a 27-segment seekable waveform. Stop collapses the player immediately; the next speech action resumes unfinished audio, while a completed unchanged answer replays from the in-memory cache.
+The compact control stays out of the way until playback starts. Left-click the speaker for the latest answer, or right-click it to speak the current clipboard text. During speech it expands into a 274 px player with a 27-segment seekable waveform. Stop collapses the player and reveals a middle waveform button for resumable audio; completed playback returns the control to its two-button state.
 
 | Compact control | Playback control |
 | --- | --- |
 | <img src="docs/screenshots/floating-button.png" alt="Compact Voice Button control" width="184"> | <img src="docs/screenshots/floating-player.png" alt="Expanded Voice Button player" width="548"> |
 
-- **Left**: use the built-in microphone in Codex or ChatGPT; start Voice Button dictation in other applications; pause or resume during playback.
-- **Center**: start speech when idle; click or drag the waveform to seek during playback.
-- **Right**: stop the current playback.
+- **Compact left**: use the built-in microphone in Codex or ChatGPT; start Voice Button dictation in other applications.
+- **Compact right**: left-click to speak the latest answer; right-click to speak clipboard text.
+- **Saved audio**: the middle waveform appears only when stopped audio can be resumed.
+- **Expanded player**: pause or resume on the left, seek through the waveform, and stop on the right.
 
 ## Interface
 

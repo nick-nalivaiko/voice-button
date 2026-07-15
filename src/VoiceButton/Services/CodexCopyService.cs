@@ -200,9 +200,11 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
 
     private static bool IsCopyButtonName(string name)
     {
-        return name.Contains("copy", StringComparison.OrdinalIgnoreCase)
-            || name.Contains("копировать", StringComparison.OrdinalIgnoreCase)
-            || name.Contains("копіювати", StringComparison.OrdinalIgnoreCase);
+        var normalized = name.Trim();
+        return IsGenericCopyButtonName(normalized)
+            || normalized.StartsWith("copy ", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("копировать ", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("копіювати ", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCodeCopyButtonName(string name)
@@ -225,6 +227,11 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
 
     private static bool IsLikelyAnswerCopyButton(CopyButtonCandidate candidate, CopyButtonLayout layout)
     {
+        if (IsLikelyPromptCopyButton(candidate, layout))
+        {
+            return false;
+        }
+
         return IsLeftSideCandidate(candidate.Bounds, layout)
             || candidate.Name.Contains("answer", StringComparison.OrdinalIgnoreCase)
             || candidate.Name.Contains("response", StringComparison.OrdinalIgnoreCase)
@@ -234,18 +241,32 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
 
     private static bool IsLikelyPromptCopyButton(CopyButtonCandidate candidate, CopyButtonLayout layout)
     {
-        var rightSide = IsRightSideCandidate(candidate.Bounds, layout);
-        if (!rightSide)
+        if (IsPromptCopyButtonName(candidate.Name))
+        {
+            return true;
+        }
+
+        if (!IsRightSideCandidate(candidate.Bounds, layout))
         {
             return false;
         }
 
-        return candidate.Name.Contains("message", StringComparison.OrdinalIgnoreCase)
-            || candidate.Name.Contains("сообщ", StringComparison.OrdinalIgnoreCase)
-            || candidate.Name.Contains("повідом", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(candidate.Name.Trim(), "Copy", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(candidate.Name.Trim(), "Копировать", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(candidate.Name.Trim(), "Копіювати", StringComparison.OrdinalIgnoreCase);
+        return IsGenericCopyButtonName(candidate.Name);
+    }
+
+    private static bool IsPromptCopyButtonName(string name)
+    {
+        return name.Contains("copy message", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("copy user message", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("копировать сообщение", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("копіювати повідомлення", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGenericCopyButtonName(string name)
+    {
+        return string.Equals(name.Trim(), "Copy", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name.Trim(), "Копировать", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name.Trim(), "Копіювати", StringComparison.OrdinalIgnoreCase);
     }
 
     private static CopyButtonLayout BuildCopyButtonLayout(WpfRect rootBounds, IReadOnlyList<CopyButtonCandidate> candidates)

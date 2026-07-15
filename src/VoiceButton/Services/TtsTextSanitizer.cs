@@ -92,11 +92,11 @@ public static partial class TtsTextSanitizer
 
     private static string SanitizeFilePaths(string text)
     {
-        var sanitized = MarkdownFileLinkRegex().Replace(text, match =>
+        var sanitized = MarkdownLinkWithTargetRegex().Replace(text, match =>
         {
             var label = match.Groups["label"].Value;
-            var target = match.Groups["target"].Value.Trim('<', '>');
-            return LooksLikeFilePath(target) ? Sanitize(label, TtsTextSanitizerOptions.PathOnly) : match.Value;
+            // The destination is hidden in the UI, so speech should use only the visible label.
+            return Sanitize(label, TtsTextSanitizerOptions.PathOnly);
         });
 
         sanitized = AnglePathRegex().Replace(sanitized, match => PathTail(match.Groups["path"].Value));
@@ -231,18 +231,6 @@ public static partial class TtsTextSanitizer
         return string.Join('\n', result);
     }
 
-    private static bool LooksLikeFilePath(string value)
-    {
-        if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            value.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return value.Contains('\\') ||
-               value.Contains('/') ||
-               DriveRootRegex().IsMatch(value);
-    }
 
     private static string PathTail(string rawPath)
     {
@@ -324,7 +312,7 @@ public static partial class TtsTextSanitizer
     }
 
     [GeneratedRegex(@"\[(?<label>[^\]]+)\]\((?<target><[^>]+>|[^\)]+)\)")]
-    private static partial Regex MarkdownFileLinkRegex();
+    private static partial Regex MarkdownLinkWithTargetRegex();
 
     [GeneratedRegex(@"<(?<path>(?:[A-Za-z]:[\\/]|/|\.\.?[\\/])[^>\r\n]+?)>")]
     private static partial Regex AnglePathRegex();
@@ -338,11 +326,6 @@ public static partial class TtsTextSanitizer
     [GeneratedRegex(@"(?<![\w:])(?<path>(?:\.{1,2}[\\/]|[A-Za-z0-9_. -]+[\\/])(?:[A-Za-z0-9_. -]+[\\/])*[A-Za-z0-9_. -]+\.[A-Za-z0-9]{1,12}(?::\d+)?)")]
     private static partial Regex RelativeFilePathRegex();
 
-    [GeneratedRegex(@"^[A-Za-z]:[\\/]")]
-    private static partial Regex DriveRootRegex();
-
-    [GeneratedRegex(@"^[A-Za-z0-9_. -]+\.[A-Za-z0-9]{1,12}(?::\d+)?$")]
-    private static partial Regex FileNameRegex();
 
     [GeneratedRegex(@"(?<suffix>:\d+)$")]
     private static partial Regex LineSuffixRegex();

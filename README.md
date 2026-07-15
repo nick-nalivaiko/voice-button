@@ -1,6 +1,6 @@
 # Voice Button
 
-[![Build](https://github.com/nick-nalivaiko/VoiceButton/actions/workflows/build.yml/badge.svg)](https://github.com/nick-nalivaiko/VoiceButton/actions/workflows/build.yml)
+[![Build](https://github.com/nick-nalivaiko/voice-button/actions/workflows/build.yml/badge.svg)](https://github.com/nick-nalivaiko/voice-button/actions/workflows/build.yml)
 ![Windows](https://img.shields.io/badge/platform-Windows-1E96FF)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
 
@@ -82,7 +82,7 @@ A self-contained portable build includes the .NET runtime and does not require a
 
 ## Download
 
-Get the current Windows release from [GitHub Releases](https://github.com/nick-nalivaiko/VoiceButton/releases/latest):
+Get the current Windows release from [GitHub Releases](https://github.com/nick-nalivaiko/voice-button/releases/latest):
 
 - **Installer**: recommended for a normal per-user Windows installation with Start menu and uninstall support.
 - **Portable ZIP**: extract anywhere and run without installation or a separate .NET runtime.
@@ -92,7 +92,7 @@ Neither release package contains an OpenAI API key. Enter your own key in **Spee
 ## Build and run
 
 ```powershell
-git clone https://github.com/nick-nalivaiko/VoiceButton.git
+git clone https://github.com/nick-nalivaiko/voice-button.git
 cd VoiceButton
 
 dotnet restore VoiceButton.sln

@@ -4,7 +4,7 @@
 
 #define AppName "Voice Button"
 #define AppPublisher "Mykola Nalivaiko"
-#define AppUrl "https://github.com/nick-nalivaiko/VoiceButton"
+#define AppUrl "https://github.com/nick-nalivaiko/voice-button"
 #define ReleaseRoot "..\artifacts\release\v" + AppVersion
 
 [Setup]

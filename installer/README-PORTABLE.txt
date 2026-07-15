@@ -12,4 +12,4 @@ applications, Voice Button records speech, transcribes it with OpenAI, and
 attempts to paste the text into the field that had focus when recording began.
 The transcript remains available in the clipboard when insertion is uncertain.
 
-Project: https://github.com/nick-nalivaiko/VoiceButton
+Project: https://github.com/nick-nalivaiko/voice-button

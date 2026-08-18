@@ -75,6 +75,8 @@ public partial class MainWindow
         ["FloatingProcessingTooltip"] = new[] { "Распознаю речь", "Розпізнаю мовлення", "Transcribing speech" },
         ["FloatingPauseTooltip"] = new[] { "Продолжить / перемотка / стоп", "Продовжити / перемотування / стоп", "Resume / seek / stop" },
         ["FloatingPlayTooltip"] = new[] { "Пауза / перемотка / стоп", "Пауза / перемотування / стоп", "Pause / seek / stop" },
+        ["FloatingLiveOffTooltip"] = new[] { "Включить озвучку хода работы Codex", "Увімкнути озвучення ходу роботи Codex", "Enable Codex work narration" },
+        ["FloatingLiveOnTooltip"] = new[] { "Выключить озвучку хода работы Codex", "Вимкнути озвучення ходу роботи Codex", "Disable Codex work narration" },
         ["OpenAiSectionTitle"] = new[] { "OpenAI", "OpenAI", "OpenAI" },
         ["ProviderLabel"] = new[] { "Поставщик", "Постачальник", "Provider" },
         ["ApiKeyLabel"] = new[] { "OpenAI API key", "OpenAI API key", "OpenAI API key" },
@@ -122,6 +124,13 @@ public partial class MainWindow
         ["ClipboardHotkeyHint"] = new[] { "Озвучивает текущий текст из буфера обмена.", "Озвучує поточний текст із буфера обміну.", "Speaks the current clipboard text." },
         ["CodexMicLabel"] = new[] { "Микрофон / диктовка", "Мікрофон / диктування", "Microphone / dictation" },
         ["CodexMicHotkeyHint"] = new[] { "В Codex и ChatGPT включает встроенный микрофон, в остальных приложениях запускает диктовку.", "У Codex і ChatGPT вмикає вбудований мікрофон, в інших програмах запускає диктування.", "Uses the built-in microphone in Codex and ChatGPT, and starts dictation in other apps." },
+        ["SendVoiceHotkeyLabel"] = new[] { "Отправить голосовой ввод", "Надіслати голосове введення", "Send voice input" },
+        ["SendVoiceHotkeyHint"] = new[] { "Нажимает Enter в активном Codex или ChatGPT и отправляет записанный голосовой ввод.", "Натискає Enter в активному Codex або ChatGPT і надсилає записане голосове введення.", "Presses Enter in the active Codex or ChatGPT window to send recorded voice input." },
+        ["SendVoiceRequiresActiveAppDetail"] = new[] { "Сначала сделай активным окно Codex или ChatGPT.", "Спочатку зроби активним вікно Codex або ChatGPT.", "Focus a Codex or ChatGPT window first." },
+        ["SendVoiceActiveAppChangedDetail"] = new[] { "Отпусти клавиши хоткея, не переключая активное окно.", "Відпусти клавіші хоткея, не перемикаючи активне вікно.", "Release the shortcut keys without switching the active window." },
+        ["SendVoiceFailedDetail"] = new[] { "Windows не удалось отправить клавишу Enter.", "Windows не вдалося надіслати клавішу Enter.", "Windows could not send the Enter key." },
+        ["VoiceInputSent"] = new[] { "Голосовой ввод отправлен", "Голосове введення надіслано", "Voice input sent" },
+        ["VoiceInputSentDetail"] = new[] { "Enter передан в {0}.", "Enter передано в {0}.", "Enter was sent to {0}." },
         ["UnassignedHotkey"] = new[] { "Не назначено", "Не призначено", "Not assigned" },
         ["ResetHotkeyButton"] = new[] { "Сброс", "Скинути", "Reset" },
         ["ClearHotkeyButton"] = new[] { "Очистить", "Очистити", "Clear" },
@@ -129,7 +138,7 @@ public partial class MainWindow
         ["HotkeyEditorTitle"] = new[] { "Как записать сочетание", "Як записати комбінацію", "How to record a shortcut" },
         ["HotkeyEditorHint"] = new[] { "Нажмите поле сочетания, затем зажмите, например, Ctrl + Alt + V. Для глобального хоткея нужна хотя бы одна служебная клавиша.", "Натисніть поле комбінації, потім затисніть, наприклад, Ctrl + Alt + V. Для глобального хоткея потрібна хоча б одна службова клавіша.", "Click a shortcut field, then press something like Ctrl + Alt + V. A global shortcut needs at least one modifier key." },
         ["IntegrationPageTitle"] = new[] { "Интеграция", "Інтеграція", "Integration" },
-        ["IntegrationPageHint"] = new[] { "Автовыбор активного Codex или ChatGPT, Copy/clipboard и запуск микрофона.", "Автовибір активного Codex або ChatGPT, Copy/clipboard і запуск мікрофона.", "Automatic active Codex or ChatGPT selection, Copy/clipboard, and microphone launch." },
+        ["IntegrationPageHint"] = new[] { "Автовыбор Codex или ChatGPT, Copy/clipboard, микрофон и live-озвучка Codex.", "Автовибір Codex або ChatGPT, Copy/clipboard, мікрофон і live-озвучення Codex.", "Automatic Codex or ChatGPT selection, Copy/clipboard, microphone, and live Codex narration." },
         ["CodexWindowSectionTitle"] = new[] { "Приложения", "Програми", "Applications" },
         ["CodexWindowKeywordsLabel"] = new[] { "Ключевые слова Codex", "Ключові слова Codex", "Codex window keywords" },
         ["CodexWindowKeywordsHint"] = new[] { "ChatGPT определяется автоматически; здесь можно уточнить заголовок или процесс Codex.", "ChatGPT визначається автоматично; тут можна уточнити заголовок або процес Codex.", "ChatGPT is detected automatically; refine the Codex title or process here." },
@@ -140,6 +149,18 @@ public partial class MainWindow
         ["RestoreClipboardHint"] = new[] { "После Copy возвращает прежний буфер обмена, если это возможно.", "Після Copy повертає попередній буфер обміну, якщо це можливо.", "After Copy, restores the previous clipboard when possible." },
         ["ClipboardFallbackLabel"] = new[] { "Озвучивать clipboard без Copy", "Озвучувати clipboard без Copy", "Use clipboard if Copy fails" },
         ["ClipboardFallbackHint"] = new[] { "Если Copy не найден, можно озвучить уже скопированный вручную текст.", "Якщо Copy не знайдено, можна озвучити вже скопійований вручну текст.", "If Copy is missing, speak already-copied manual clipboard text." },
+        ["LiveNarrationSectionTitle"] = new[] { "Озвучка хода работы Codex", "Озвучення ходу роботи Codex", "Codex work narration" },
+        ["LiveNarrationLabel"] = new[] { "Включить live-озвучку", "Увімкнути live-озвучення", "Enable live narration" },
+        ["LiveNarrationHint"] = new[] { "Показывает маленькую кнопку у динамика и позволяет озвучивать новые абзацы хода работы Codex.", "Показує маленьку кнопку біля динаміка та дозволяє озвучувати нові абзаци ходу роботи Codex.", "Shows a small speaker control that narrates new Codex work paragraphs." },
+        ["LiveNarrationOn"] = new[] { "Live-озвучка включена", "Live-озвучення увімкнено", "Live narration enabled" },
+        ["LiveNarrationOnDetail"] = new[] { "Читаю текущие и новые абзацы хода работы Codex.", "Читаю поточні та нові абзаци ходу роботи Codex.", "Current and new Codex work paragraphs will be spoken." },
+        ["LiveNarrationOff"] = new[] { "Live-озвучка выключена", "Live-озвучення вимкнено", "Live narration disabled" },
+        ["LiveNarrationOffDetail"] = new[] { "Автоматическая озвучка новых абзацев остановлена.", "Автоматичне озвучення нових абзаців зупинено.", "Automatic narration of new paragraphs has stopped." },
+        ["LiveNarrationSpeaking"] = new[] { "Озвучиваю ход работы", "Озвучую хід роботи", "Narrating Codex work" },
+        ["LiveNarrationParagraphDetail"] = new[] { "Текущий абзац Codex.", "Поточний абзац Codex.", "Current Codex paragraph." },
+        ["LiveNarrationWaiting"] = new[] { "Live-озвучка", "Live-озвучення", "Live narration" },
+        ["LiveNarrationWaitingDetail"] = new[] { "Жду следующий абзац Codex.", "Чекаю наступний абзац Codex.", "Waiting for the next Codex paragraph." },
+        ["LiveNarrationStoppedDetail"] = new[] { "Текущая очередь пропущена. Жду следующий новый абзац.", "Поточну чергу пропущено. Чекаю наступний новий абзац.", "The current queue was skipped. Waiting for the next new paragraph." },
         ["MicrophoneIntegrationSectionTitle"] = new[] { "Микрофон приложений", "Мікрофон програм", "Application microphone" },
         ["RetryMicrophoneLabel"] = new[] { "Повторять запуск микрофона", "Повторювати запуск мікрофона", "Retry microphone launch" },
         ["RetryMicrophoneHint"] = new[] { "Повторный клик применяется только к Codex; диктовка ChatGPT запускается один раз.", "Повторний клік застосовується лише до Codex; диктування ChatGPT запускається один раз.", "The retry applies only to Codex; ChatGPT dictation is started once." },
@@ -273,9 +294,12 @@ public partial class MainWindow
         ClipboardHotkeyHintText.Text = Tr("ClipboardHotkeyHint");
         CodexMicHotkeyLabelText.Text = Tr("CodexMicLabel");
         CodexMicHotkeyHintText.Text = Tr("CodexMicHotkeyHint");
+        SendVoiceHotkeyLabelText.Text = Tr("SendVoiceHotkeyLabel");
+        SendVoiceHotkeyHintText.Text = Tr("SendVoiceHotkeyHint");
         ClearSpeakLatestHotkeyButton.Content = Tr("ResetHotkeyButton");
         ClearClipboardHotkeyButton.Content = Tr("ClearHotkeyButton");
         ClearCodexMicHotkeyButton.Content = Tr("ClearHotkeyButton");
+        ClearSendVoiceHotkeyButton.Content = Tr("ClearHotkeyButton");
         UpdateHotkeyButtons();
         HotkeyEditorTitleText.Text = Tr("HotkeyEditorTitle");
         HotkeyEditorHintText.Text = Tr("HotkeyEditorHint");
@@ -292,6 +316,9 @@ public partial class MainWindow
         RestoreClipboardHintText.Text = Tr("RestoreClipboardHint");
         ClipboardFallbackLabelText.Text = Tr("ClipboardFallbackLabel");
         ClipboardFallbackHintText.Text = Tr("ClipboardFallbackHint");
+        LiveNarrationSectionTitleText.Text = Tr("LiveNarrationSectionTitle");
+        LiveNarrationLabelText.Text = Tr("LiveNarrationLabel");
+        LiveNarrationHintText.Text = Tr("LiveNarrationHint");
         MicrophoneIntegrationSectionTitleText.Text = Tr("MicrophoneIntegrationSectionTitle");
         RetryMicrophoneLabelText.Text = Tr("RetryMicrophoneLabel");
         RetryMicrophoneHintText.Text = Tr("RetryMicrophoneHint");
@@ -331,7 +358,9 @@ public partial class MainWindow
             Tr("FloatingRecordingTooltip"),
             Tr("FloatingProcessingTooltip"),
             Tr("FloatingPauseTooltip"),
-            Tr("FloatingPlayTooltip"));
+            Tr("FloatingPlayTooltip"),
+            Tr("FloatingLiveOffTooltip"),
+            Tr("FloatingLiveOnTooltip"));
     }
 
     private string Tr(string key)

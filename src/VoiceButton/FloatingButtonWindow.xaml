@@ -265,6 +265,31 @@
                     </Grid>
                 </Border>
             </Grid>
+
+            <Border x:Name="LiveNarrationButton"
+                    Panel.ZIndex="20"
+                    Width="17"
+                    Height="17"
+                    CornerRadius="8.5"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,2,2,0"
+                    Background="#071528"
+                    BorderBrush="#2B8DFF"
+                    BorderThickness="1"
+                    Visibility="Collapsed"
+                    ToolTip="Озвучивать ход работы Codex"
+                    MouseLeftButtonDown="LiveNarrationButton_MouseLeftButtonDown">
+                <Grid>
+                    <Ellipse x:Name="LiveNarrationGlow" Margin="1" Fill="#123B72" Opacity="0.28" />
+                    <Ellipse x:Name="LiveNarrationDot"
+                             Width="5"
+                             Height="5"
+                             Fill="#8BA4C2"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center" />
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </Window>

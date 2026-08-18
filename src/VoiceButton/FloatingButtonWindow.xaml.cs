@@ -29,6 +29,7 @@ public partial class FloatingButtonWindow : Window
     private readonly Action _togglePause;
     private readonly Action<double> _seek;
     private readonly Action _stop;
+    private readonly Action _toggleLiveNarration;
     private readonly Action<double, double> _savePosition;
     private readonly AppSettings _settings;
     private readonly DispatcherTimer _topmostTimer;
@@ -39,12 +40,16 @@ public partial class FloatingButtonWindow : Window
     private bool _dictationRecording;
     private bool _dictationProcessing;
     private bool _canResumePlayback;
+    private bool _liveNarrationAvailable;
+    private bool _liveNarrationActive;
     private string _compactIdleTooltip = "Микрофон / новый ответ; ПКМ по динамику: озвучить clipboard";
     private string _compactResumeTooltip = "Микрофон / продолжить аудио / новый ответ; ПКМ по динамику: clipboard";
     private string _recordingTooltip = "Остановить запись и вставить текст";
     private string _processingTooltip = "Распознаю речь";
     private string _pausedPlaybackTooltip = "Продолжить / перемотка / стоп";
     private string _playingPlaybackTooltip = "Пауза / перемотка / стоп";
+    private string _liveNarrationOffTooltip = "Включить озвучку хода работы Codex";
+    private string _liveNarrationOnTooltip = "Выключить озвучку хода работы Codex";
     private double _compactRight;
     private double _compactTop;
     private IntPtr _windowHandle;
@@ -57,6 +62,7 @@ public partial class FloatingButtonWindow : Window
         Action togglePause,
         Action<double> seek,
         Action stop,
+        Action toggleLiveNarration,
         AppSettings settings,
         Action<double, double> savePosition)
     {
@@ -68,6 +74,7 @@ public partial class FloatingButtonWindow : Window
         _togglePause = togglePause;
         _seek = seek;
         _stop = stop;
+        _toggleLiveNarration = toggleLiveNarration;
         _settings = settings;
         _savePosition = savePosition;
         _topmostTimer = new DispatcherTimer
@@ -238,6 +245,15 @@ public partial class FloatingButtonWindow : Window
 
         _speakClipboard();
     }
+
+    private void LiveNarrationButton_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (_liveNarrationAvailable)
+        {
+            _toggleLiveNarration();
+        }
+    }
     private void ButtonShell_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_isSeeking)
@@ -307,13 +323,31 @@ public partial class FloatingButtonWindow : Window
         }
     }
 
+    public void SetLiveNarrationState(bool available, bool active)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => SetLiveNarrationState(available, active));
+            return;
+        }
+
+        _liveNarrationAvailable = available;
+        _liveNarrationActive = available && active;
+        if (IsLoaded)
+        {
+            ApplyPlaybackVisual();
+        }
+    }
+
     public void SetLocalizedTooltips(
         string compactIdle,
         string compactResume,
         string recording,
         string processing,
         string pausedPlayback,
-        string playingPlayback)
+        string playingPlayback,
+        string liveNarrationOff,
+        string liveNarrationOn)
     {
         _compactIdleTooltip = compactIdle;
         _compactResumeTooltip = compactResume;
@@ -321,6 +355,8 @@ public partial class FloatingButtonWindow : Window
         _processingTooltip = processing;
         _pausedPlaybackTooltip = pausedPlayback;
         _playingPlaybackTooltip = playingPlayback;
+        _liveNarrationOffTooltip = liveNarrationOff;
+        _liveNarrationOnTooltip = liveNarrationOn;
         if (IsLoaded)
         {
             ApplyPlaybackVisual();
@@ -361,6 +397,16 @@ public partial class FloatingButtonWindow : Window
 
         PlayedWaveformClip.Width = PlayedWaveformWidth * _playbackSnapshot.Progress;
         PlaybackTimeText.Text = FormatTime(_playbackSnapshot.Position);
+        LiveNarrationButton.Visibility = _liveNarrationAvailable ? Visibility.Visible : Visibility.Collapsed;
+        LiveNarrationButton.Background = BrushFromHex(_liveNarrationActive ? "#123B72" : "#071528");
+        LiveNarrationButton.BorderBrush = BrushFromHex(_liveNarrationActive ? "#37D0F4" : "#2B8DFF");
+        LiveNarrationGlow.Fill = BrushFromHex(_liveNarrationActive ? "#1D7FFF" : "#123B72");
+        LiveNarrationGlow.Opacity = _liveNarrationActive ? 0.72 : 0.28;
+        LiveNarrationDot.Fill = BrushFromHex(_liveNarrationActive ? "#8AF2FF" : "#8BA4C2");
+        LiveNarrationButton.ToolTip = _liveNarrationActive ? _liveNarrationOnTooltip : _liveNarrationOffTooltip;
+        System.Windows.Automation.AutomationProperties.SetName(
+            LiveNarrationButton,
+            LiveNarrationButton.ToolTip?.ToString() ?? string.Empty);
         ButtonShell.ToolTip = active
             ? (_playbackSnapshot.IsPaused ? _pausedPlaybackTooltip : _playingPlaybackTooltip)
             : _dictationRecording
@@ -441,5 +487,10 @@ public partial class FloatingButtonWindow : Window
     {
         var totalMinutes = Math.Max(0, (int)position.TotalMinutes);
         return $"{totalMinutes}:{Math.Max(0, position.Seconds):00}";
+    }
+
+    private static SolidColorBrush BrushFromHex(string color)
+    {
+        return (SolidColorBrush)new BrushConverter().ConvertFromString(color)!;
     }
 }

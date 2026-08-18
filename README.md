@@ -16,8 +16,9 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **Buffered streaming playback**: starts once ten seconds are buffered (or a shorter clip is complete) and protects a four-second reserve during network slowdowns.
 - **Floating controls**: microphone on the left, latest-answer speech on the right, right-click speaker playback for the clipboard, and an expanding player during playback.
 - **Real playback controls**: pause/resume, waveform seeking, elapsed time, and stop.
+- **Live Codex narration**: an optional corner control follows visible Codex work paragraphs and plays each one through the same seekable player.
 - **Universal dictation**: records speech, transcribes it with OpenAI, and inserts it into the focused input field or leaves it in the clipboard.
-- **Global hotkeys**: configurable shortcuts for the latest answer, clipboard speech, and context-aware microphone action.
+- **Global hotkeys**: configurable shortcuts for the latest answer, clipboard speech, context-aware microphone action, and sending recorded assistant input with Enter.
 - **Clipboard protection**: restores the previous clipboard value when possible.
 - **Speech cleanup**: removes or shortens paths, code, links, secrets, hashes, stack traces, tables, structured data, shell commands, and long numeric identifiers.
 - **Long-answer support**: sanitizes and chunks long replies before sequential playback.
@@ -38,6 +39,7 @@ The compact control stays out of the way until playback starts. Left-click the s
 - **Compact right**: left-click to speak the latest answer; right-click to speak clipboard text.
 - **Saved audio**: the middle waveform appears only when stopped audio can be resumed.
 - **Expanded player**: pause or resume on the left, seek through the waveform, and stop on the right.
+- **Live corner control**: enable it to queue visible Codex work paragraphs. Pause and seek operate on the current paragraph; stop skips the current live queue and waits for the next paragraph.
 
 ## Interface
 
@@ -65,11 +67,13 @@ Codex and ChatGPT are explicit exceptions: the microphone action keeps using the
 
 Click a shortcut field and press the desired key combination. Changes are registered globally and saved automatically.
 
+The fourth action sends the current built-in Codex or ChatGPT voice input by delivering Enter to the active assistant window.
+
 ![Hotkey settings](docs/screenshots/hotkeys.png)
 
 ### Codex and ChatGPT integration
 
-Tune window detection, Copy discovery, clipboard restoration, microphone retry behavior, and diagnostics.
+Tune window detection, Copy discovery, clipboard restoration, microphone retry behavior, optional live Codex work narration, and diagnostics.
 
 ![Codex and ChatGPT integration settings](docs/screenshots/integration.png)
 
@@ -157,6 +161,8 @@ git config core.hooksPath .githooks
 6. Each MP3 response begins playing from a ten-second buffer, or as soon as a shorter clip is complete, while the remaining audio continues to arrive.
 7. Audio is played in order through the floating seekable player, with automatic rebuffering when needed.
 
+When live Codex narration is enabled globally, Voice Button watches the visible accessibility tree for the current Codex work block. The corner control starts or stops automatic narration. Stable paragraphs are queued in order, sanitized by the same speech filters, and played one at a time through the existing player. Pausing preserves the exact position and pending paragraphs; stopping discards the current live queue while leaving the mode ready for the next new paragraph.
+
 The primary answer-reading path does not use screenshots or OCR.
 
 For dictation, Voice Button captures 16 kHz mono audio locally, sends the completed WAV recording to the selected OpenAI transcription model, restores the original target application, and sends Ctrl+V when keyboard focus still belongs to that target. The transcript remains available in the clipboard whenever insertion cannot be verified.
@@ -166,6 +172,7 @@ For dictation, Voice Button captures 16 kHz mono audio locally, sends the comple
 - Codex or ChatGPT UI updates can require selector adjustments.
 - Copy controls that only appear on hover depend on the hover-reveal fallback.
 - The target application must expose enough information through Windows UI Automation.
+- Live narration can read only work text that Codex exposes through Windows accessibility; hidden internal reasoning is not available.
 - Elevated, protected, or accessibility-limited applications can reject synthetic paste input; clipboard fallback remains available.
 - OpenAI API usage is billed by OpenAI according to the account attached to the API key.
 
@@ -181,4 +188,4 @@ VoiceButton.sln                 Visual Studio solution
 
 ## Status
 
-Voice Button is a working Windows utility with Codex and ChatGPT answer playback, context-aware built-in microphone control, universal dictation, configurable hotkeys, a floating seekable player, speech cleanup, tray behavior, diagnostics, and portable settings.
+Voice Button is a working Windows utility with Codex and ChatGPT answer playback, live visible Codex work narration, context-aware built-in microphone control, universal dictation, configurable hotkeys, a floating seekable player, speech cleanup, tray behavior, diagnostics, and portable settings.

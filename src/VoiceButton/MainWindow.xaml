@@ -906,7 +906,7 @@
                                 <Button x:Name="ClearClipboardHotkeyButton" Grid.Column="3" Tag="Clipboard" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
                             </Grid>
 
-                            <Grid Margin="0,0,0,24">
+                            <Grid Margin="0,0,0,18">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /><ColumnDefinition Width="124" /></Grid.ColumnDefinitions>
                                 <TextBlock Style="{StaticResource RowIcon}" Text="&#xE720;" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -915,6 +915,17 @@
                                 </StackPanel>
                                 <Button x:Name="CodexMicHotkeyButton" Grid.Column="2" Tag="CodexMic" Style="{StaticResource SecondaryButton}" Content="Не назначено" Click="HotkeyButton_Click" />
                                 <Button x:Name="ClearCodexMicHotkeyButton" Grid.Column="3" Tag="CodexMic" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /><ColumnDefinition Width="124" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE724;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="SendVoiceHotkeyLabelText" Style="{StaticResource FieldLabel}" Text="Отправить голосовой ввод" />
+                                    <TextBlock x:Name="SendVoiceHotkeyHintText" Style="{StaticResource FieldHint}" Text="Нажимает Enter в активном Codex или ChatGPT и отправляет записанный голосовой ввод." />
+                                </StackPanel>
+                                <Button x:Name="SendVoiceHotkeyButton" Grid.Column="2" Tag="SendVoice" Style="{StaticResource SecondaryButton}" Content="Не назначено" Click="HotkeyButton_Click" />
+                                <Button x:Name="ClearSendVoiceHotkeyButton" Grid.Column="3" Tag="SendVoice" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
                             </Grid>
 
                             <Border Style="{StaticResource InfoCard}" MaxWidth="720" HorizontalAlignment="Left">
@@ -966,6 +977,17 @@
                                     <TextBlock x:Name="ClipboardFallbackHintText" Style="{StaticResource FieldHint}" Text="Если Copy не найден, можно озвучить уже скопированный вручную текст." />
                                 </StackPanel>
                                 <ToggleButton x:Name="ClipboardFallbackToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
+                            </Grid>
+
+                            <TextBlock x:Name="LiveNarrationSectionTitleText" Style="{StaticResource SectionTitle}" Text="Озвучка хода работы Codex" Margin="0,0,0,12" />
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE767;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                                    <TextBlock x:Name="LiveNarrationLabelText" Style="{StaticResource FieldLabel}" Text="Включить live-озвучку" />
+                                    <TextBlock x:Name="LiveNarrationHintText" Style="{StaticResource FieldHint}" Text="Показывает маленькую кнопку у динамика и позволяет озвучивать новые абзацы хода работы Codex." />
+                                </StackPanel>
+                                <ToggleButton x:Name="LiveNarrationToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
                             </Grid>
 
                             <TextBlock x:Name="MicrophoneIntegrationSectionTitleText" Style="{StaticResource SectionTitle}" Text="Микрофон приложения" Margin="0,0,0,12" />

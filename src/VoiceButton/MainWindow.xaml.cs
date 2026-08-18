@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private const string SpeakLatestHotkeyId = "SpeakLatest";
     private const string ClipboardHotkeyId = "Clipboard";
     private const string CodexMicHotkeyId = "CodexMic";
+    private const string SendVoiceHotkeyId = "SendVoice";
 
     private readonly VoiceButtonSettings _settings = new();
     private readonly AppSettingsStore _appSettingsStore = new();
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
     private readonly CodexWindowFinder _codexWindowFinder;
     private readonly CodexCopyService _codexCopyService;
     private readonly CodexMicrophoneService _codexMicrophoneService;
+    private readonly CodexLiveNarrationMonitor _liveNarrationMonitor;
     private readonly OpenAiSpeechClient _speechClient;
     private readonly OpenAiTranscriptionClient _transcriptionClient;
     private readonly DictationRecorderService _dictationRecorderService = new();
@@ -35,6 +37,8 @@ public partial class MainWindow : Window
     private readonly AudioPlaybackService _audioPlaybackService;
     private readonly GlobalHotkeyService _hotkeyService = new();
     private readonly DiagnosticsLogService _diagnosticsLog = new();
+    private readonly Queue<LiveNarrationQueueItem> _liveNarrationQueue = [];
+    private readonly HashSet<string> _handledLiveNarrationParagraphs = new(StringComparer.Ordinal);
 
     private CancellationTokenSource? _currentRun;
     private CancellationTokenSource? _latestCaptureRun;
@@ -44,6 +48,7 @@ public partial class MainWindow : Window
     private int _cachedSpeechChunkCount;
     private bool _playbackStopped;
     private bool _currentRunIsSpeech;
+    private bool _currentRunIsLiveNarration;
     private bool _isReplacingLatest;
     private TrayIconService? _trayIconService;
     private FloatingButtonWindow? _floatingButtonWindow;
@@ -56,6 +61,10 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _dictationRun;
     private string _currentPage = "General";
     private string? _capturingHotkeyId;
+    private LiveNarrationSnapshot _liveNarrationSnapshot = LiveNarrationSnapshot.Empty;
+    private string? _handledLiveNarrationSessionId;
+    private bool _liveNarrationActive;
+    private bool _liveNarrationPumpRunning;
 
     public MainWindow()
     {
@@ -72,6 +81,8 @@ public partial class MainWindow : Window
         _codexWindowFinder = new CodexWindowFinder(_appSettings);
         _codexCopyService = new CodexCopyService(_codexWindowFinder, _clipboardService, _appSettings);
         _codexMicrophoneService = new CodexMicrophoneService(_codexWindowFinder, _appSettings);
+        _liveNarrationMonitor = new CodexLiveNarrationMonitor(_codexWindowFinder, _diagnosticsLog);
+        _liveNarrationMonitor.SnapshotChanged += LiveNarrationMonitor_SnapshotChanged;
         _speechClient = new OpenAiSpeechClient(new HttpClient());
         _transcriptionClient = new OpenAiTranscriptionClient(new HttpClient());
         _dictationTextInsertionService = new DictationTextInsertionService(_clipboardService);
@@ -130,6 +141,7 @@ public partial class MainWindow : Window
         RestoreClipboardToggle.IsChecked = _appSettings.RestoreClipboardAfterCopy;
         ClipboardFallbackToggle.IsChecked = _appSettings.FallbackToClipboardWhenCopyMissing;
         RetryMicrophoneToggle.IsChecked = _appSettings.RetryMicrophoneIfInactive;
+        LiveNarrationToggle.IsChecked = _appSettings.EnableCodexLiveNarration;
         InsertDictationToggle.IsChecked = _appSettings.InsertDictationAutomatically;
         RestoreDictationClipboardToggle.IsChecked = _appSettings.RestoreClipboardAfterDictation;
         _appSettings.StartWithWindows = IsStartWithWindowsEnabled();
@@ -172,6 +184,11 @@ public partial class MainWindow : Window
             ExitApplication);
 
         ShowFloatingButton();
+
+        if (_appSettings.EnableCodexLiveNarration)
+        {
+            _liveNarrationMonitor.Start();
+        }
 
         _hotkeyService.Pressed += (_, actionId) => RunHotkeyAction(actionId);
         RegisterConfiguredHotkeys();
@@ -439,6 +456,9 @@ public partial class MainWindow : Window
             case CodexMicHotkeyId:
                 _ = StartVoiceInputOrWhileStoppedAsync();
                 break;
+            case SendVoiceHotkeyId:
+                _ = SendVoiceInputAsync();
+                break;
         }
     }
 
@@ -471,6 +491,7 @@ public partial class MainWindow : Window
         AddHotkeyRegistration(registrations, SpeakLatestHotkeyId, SpeakHotkeyLabelText.Text, _appSettings.SpeakLatestHotkey);
         AddHotkeyRegistration(registrations, ClipboardHotkeyId, ClipboardHotkeyLabelText.Text, _appSettings.SpeakClipboardHotkey);
         AddHotkeyRegistration(registrations, CodexMicHotkeyId, CodexMicHotkeyLabelText.Text, _appSettings.CodexMicHotkey);
+        AddHotkeyRegistration(registrations, SendVoiceHotkeyId, SendVoiceHotkeyLabelText.Text, _appSettings.SendVoiceInputHotkey);
         return registrations;
     }
 
@@ -487,6 +508,7 @@ public partial class MainWindow : Window
         SpeakLatestHotkeyButton.Content = _capturingHotkeyId == SpeakLatestHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.SpeakLatestHotkey);
         ClipboardHotkeyButton.Content = _capturingHotkeyId == ClipboardHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.SpeakClipboardHotkey);
         CodexMicHotkeyButton.Content = _capturingHotkeyId == CodexMicHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.CodexMicHotkey);
+        SendVoiceHotkeyButton.Content = _capturingHotkeyId == SendVoiceHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.SendVoiceInputHotkey);
     }
 
     private bool IsDuplicateHotkey(string currentHotkeyId, string value)
@@ -496,7 +518,8 @@ public partial class MainWindow : Window
             {
                 (Id: SpeakLatestHotkeyId, Value: _appSettings.SpeakLatestHotkey),
                 (Id: ClipboardHotkeyId, Value: _appSettings.SpeakClipboardHotkey),
-                (Id: CodexMicHotkeyId, Value: _appSettings.CodexMicHotkey)
+                (Id: CodexMicHotkeyId, Value: _appSettings.CodexMicHotkey),
+                (Id: SendVoiceHotkeyId, Value: _appSettings.SendVoiceInputHotkey)
             }.Any(item => item.Id != currentHotkeyId
                 && HotkeyGesture.TryParse(item.Value, out var existing)
                 && string.Equals(existing.StorageValue, gesture.StorageValue, StringComparison.OrdinalIgnoreCase));
@@ -513,6 +536,7 @@ public partial class MainWindow : Window
         {
             ClipboardHotkeyId => ClipboardHotkeyButton,
             CodexMicHotkeyId => CodexMicHotkeyButton,
+            SendVoiceHotkeyId => SendVoiceHotkeyButton,
             _ => SpeakLatestHotkeyButton
         };
     }
@@ -523,6 +547,7 @@ public partial class MainWindow : Window
         {
             ClipboardHotkeyId => _appSettings.SpeakClipboardHotkey,
             CodexMicHotkeyId => _appSettings.CodexMicHotkey,
+            SendVoiceHotkeyId => _appSettings.SendVoiceInputHotkey,
             _ => _appSettings.SpeakLatestHotkey
         };
     }
@@ -537,10 +562,58 @@ public partial class MainWindow : Window
             case CodexMicHotkeyId:
                 _appSettings.CodexMicHotkey = value;
                 break;
+            case SendVoiceHotkeyId:
+                _appSettings.SendVoiceInputHotkey = value;
+                break;
             default:
                 _appSettings.SpeakLatestHotkey = value;
                 break;
         }
+    }
+
+    private async Task SendVoiceInputAsync()
+    {
+        try
+        {
+            var window = _codexWindowFinder.FindForegroundWindow();
+            if (window is null)
+            {
+                throw new InvalidOperationException(Tr("SendVoiceRequiresActiveAppDetail"));
+            }
+
+            for (var attempt = 0; attempt < 50 && IsSendVoiceHotkeyDown(); attempt++)
+            {
+                await Task.Delay(20);
+            }
+
+            if (IsSendVoiceHotkeyDown()
+                || NativeMethods.GetForegroundWindow() != window.Handle)
+            {
+                throw new InvalidOperationException(Tr("SendVoiceActiveAppChangedDetail"));
+            }
+
+            if (!NativeMethods.SendEnterKey())
+            {
+                throw new InvalidOperationException(Tr("SendVoiceFailedDetail"));
+            }
+
+            SetStatus(Tr("VoiceInputSent"), string.Format(Tr("VoiceInputSentDetail"), window.AppName), "#41D6A1", busy: false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
+        }
+    }
+
+    private bool IsSendVoiceHotkeyDown()
+    {
+        if (NativeMethods.AreHotkeyModifiersDown())
+        {
+            return true;
+        }
+
+        return HotkeyGesture.TryParse(_appSettings.SendVoiceInputHotkey, out var gesture)
+            && NativeMethods.IsVirtualKeyDown(KeyInterop.VirtualKeyFromKey(gesture.Key));
     }
     private void FloatingButtonToggle_Changed(object sender, RoutedEventArgs e)
     {
@@ -874,8 +947,30 @@ public partial class MainWindow : Window
         _appSettings.RestoreClipboardAfterCopy = RestoreClipboardToggle.IsChecked == true;
         _appSettings.FallbackToClipboardWhenCopyMissing = ClipboardFallbackToggle.IsChecked == true;
         _appSettings.RetryMicrophoneIfInactive = RetryMicrophoneToggle.IsChecked == true;
+        var liveNarrationWasEnabled = _appSettings.EnableCodexLiveNarration;
+        _appSettings.EnableCodexLiveNarration = LiveNarrationToggle.IsChecked == true;
         _appSettingsStore.Save(_appSettings);
+
+        if (liveNarrationWasEnabled != _appSettings.EnableCodexLiveNarration)
+        {
+            ApplyLiveNarrationFeatureState();
+        }
+
         SetStatus(Tr("IntegrationPageTitle"), Tr("IntegrationSavedDetail"), "#41D6A1", busy: false);
+    }
+
+    private void ApplyLiveNarrationFeatureState()
+    {
+        if (_appSettings.EnableCodexLiveNarration)
+        {
+            _liveNarrationMonitor.Start();
+            _floatingButtonWindow?.SetLiveNarrationState(available: true, active: _liveNarrationActive);
+            return;
+        }
+
+        DisableLiveNarration();
+        _liveNarrationMonitor.Stop();
+        _floatingButtonWindow?.SetLiveNarrationState(available: false, active: false);
     }
 
     private void CodexWindowKeywordsBox_LostFocus(object sender, RoutedEventArgs e)
@@ -1019,6 +1114,187 @@ public partial class MainWindow : Window
 
         return keywords.Length == 0 ? "Codex" : string.Join(", ", keywords);
     }
+
+    private void LiveNarrationMonitor_SnapshotChanged(object? sender, LiveNarrationSnapshot snapshot)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            if (!Dispatcher.HasShutdownStarted)
+            {
+                _ = Dispatcher.BeginInvoke(() => ApplyLiveNarrationSnapshot(snapshot));
+            }
+
+            return;
+        }
+
+        ApplyLiveNarrationSnapshot(snapshot);
+    }
+
+    private void ApplyLiveNarrationSnapshot(LiveNarrationSnapshot snapshot)
+    {
+        _liveNarrationSnapshot = snapshot;
+        if (!string.IsNullOrWhiteSpace(snapshot.SessionId)
+            && !string.Equals(snapshot.SessionId, _handledLiveNarrationSessionId, StringComparison.Ordinal))
+        {
+            _handledLiveNarrationSessionId = snapshot.SessionId;
+            _handledLiveNarrationParagraphs.Clear();
+        }
+
+        if (_liveNarrationActive)
+        {
+            QueueLiveNarrationSnapshot(snapshot);
+        }
+    }
+
+    private void ToggleLiveNarration()
+    {
+        if (!_appSettings.EnableCodexLiveNarration)
+        {
+            return;
+        }
+
+        if (_liveNarrationActive)
+        {
+            DisableLiveNarration();
+            SetStatus(Tr("LiveNarrationOff"), Tr("LiveNarrationOffDetail"), "#F9C74F", busy: false);
+            return;
+        }
+
+        try
+        {
+            EnsureApiKeyReady();
+            _liveNarrationActive = true;
+            _floatingButtonWindow?.SetLiveNarrationState(available: true, active: true);
+            QueueLiveNarrationSnapshot(_liveNarrationSnapshot);
+            SetStatus(Tr("LiveNarrationOn"), Tr("LiveNarrationOnDetail"), "#41D6A1", busy: false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
+        }
+    }
+
+    private void DisableLiveNarration()
+    {
+        _liveNarrationActive = false;
+        _liveNarrationQueue.Clear();
+
+        if (_currentRunIsLiveNarration)
+        {
+            _currentRun?.Cancel();
+            _audioPlaybackService.Cancel();
+        }
+
+        _floatingButtonWindow?.SetLiveNarrationState(
+            _appSettings.EnableCodexLiveNarration,
+            active: false);
+    }
+
+    private void QueueLiveNarrationSnapshot(LiveNarrationSnapshot snapshot)
+    {
+        if (!_liveNarrationActive || string.IsNullOrWhiteSpace(snapshot.SessionId))
+        {
+            return;
+        }
+
+        foreach (var paragraph in snapshot.Paragraphs)
+        {
+            var key = $"{snapshot.SessionId}:{paragraph.Index}";
+            if (_handledLiveNarrationParagraphs.Add(key))
+            {
+                _liveNarrationQueue.Enqueue(new LiveNarrationQueueItem(paragraph.Text));
+            }
+        }
+
+        StartLiveNarrationPump();
+    }
+
+    private void StartLiveNarrationPump()
+    {
+        if (!_liveNarrationActive
+            || _liveNarrationPumpRunning
+            || _liveNarrationQueue.Count == 0
+            || _currentRun is not null
+            || _dictationRecorderService.IsRecording
+            || _isDictationProcessing)
+        {
+            return;
+        }
+
+        _liveNarrationPumpRunning = true;
+        _ = PumpLiveNarrationAsync();
+    }
+
+    private async Task PumpLiveNarrationAsync()
+    {
+        try
+        {
+            while (_liveNarrationActive && _liveNarrationQueue.Count > 0)
+            {
+                if (_currentRun is not null
+                    || _dictationRecorderService.IsRecording
+                    || _isDictationProcessing)
+                {
+                    break;
+                }
+
+                var paragraph = _liveNarrationQueue.Dequeue();
+                if (!TryStartRun(out var cancellationToken, isSpeech: true, isLiveNarration: true))
+                {
+                    break;
+                }
+
+                try
+                {
+                    SetStatus(Tr("LiveNarrationSpeaking"), Tr("LiveNarrationParagraphDetail"), "#41D6A1", busy: true);
+                    await SpeakTextAsync(paragraph.Text, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    if (_liveNarrationActive)
+                    {
+                        SetStatus(Tr("LiveNarrationWaiting"), Tr("LiveNarrationWaitingDetail"), "#F9C74F", busy: false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _diagnosticsLog.Error("Codex live narration playback", ex);
+                    SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
+                }
+                finally
+                {
+                    FinishRun();
+                }
+            }
+        }
+        finally
+        {
+            _liveNarrationPumpRunning = false;
+            if (_liveNarrationActive && _liveNarrationQueue.Count > 0 && _currentRun is null)
+            {
+                StartLiveNarrationPump();
+            }
+            else if (_liveNarrationActive && _currentRun is null)
+            {
+                SetStatus(Tr("LiveNarrationWaiting"), Tr("LiveNarrationWaitingDetail"), "#41D6A1", busy: false);
+            }
+        }
+    }
+
+    private void StopLiveNarrationQueue()
+    {
+        _liveNarrationQueue.Clear();
+        if (_currentRunIsLiveNarration)
+        {
+            _currentRun?.Cancel();
+            _audioPlaybackService.Cancel();
+        }
+
+        _playbackStopped = false;
+        _floatingButtonWindow?.SetResumeAvailable(false);
+        SetStatus(Tr("LiveNarrationWaiting"), Tr("LiveNarrationStoppedDetail"), "#F9C74F", busy: false);
+    }
+
     private void ResumeSavedPlayback()
     {
         if (!_playbackStopped || _currentRun is null)
@@ -1183,6 +1459,7 @@ public partial class MainWindow : Window
             run.Dispose();
             _floatingButtonWindow?.SetDictationState(recording: false, processing: false);
             SetBusy(false);
+            StartLiveNarrationPump();
         }
     }
     private async Task StartActiveVoiceInputAsync()
@@ -1235,10 +1512,18 @@ public partial class MainWindow : Window
         {
             if (_currentRun is not null && _currentRunIsSpeech)
             {
-                _playbackStopped = true;
-                _floatingButtonWindow?.SetResumeAvailable(true);
-                _audioPlaybackService.StopAndCollapse();
-                _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
+                if (_currentRunIsLiveNarration)
+                {
+                    _liveNarrationQueue.Clear();
+                    await CancelCurrentSpeechRunAndWaitAsync();
+                }
+                else
+                {
+                    _playbackStopped = true;
+                    _floatingButtonWindow?.SetResumeAvailable(true);
+                    _audioPlaybackService.StopAndCollapse();
+                    _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
+                }
             }
 
             using var captureRun = new CancellationTokenSource();
@@ -1368,6 +1653,11 @@ public partial class MainWindow : Window
             if (string.IsNullOrWhiteSpace(text))
             {
                 throw new InvalidOperationException("В clipboard нет текста для озвучки.");
+            }
+
+            if (_currentRunIsLiveNarration)
+            {
+                _liveNarrationQueue.Clear();
             }
 
             await CancelCurrentSpeechRunAndWaitAsync();
@@ -1537,7 +1827,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private bool TryStartRun(out CancellationToken cancellationToken, bool isSpeech = false)
+    private bool TryStartRun(
+        out CancellationToken cancellationToken,
+        bool isSpeech = false,
+        bool isLiveNarration = false)
     {
         cancellationToken = CancellationToken.None;
         if (_dictationRecorderService.IsRecording || _isDictationProcessing)
@@ -1557,6 +1850,7 @@ public partial class MainWindow : Window
         _floatingButtonWindow?.SetResumeAvailable(false);
         _currentRun = new CancellationTokenSource();
         _currentRunIsSpeech = isSpeech;
+        _currentRunIsLiveNarration = isLiveNarration;
         cancellationToken = _currentRun.Token;
         SetBusy(true);
         return true;
@@ -1568,8 +1862,10 @@ public partial class MainWindow : Window
         _currentRun = null;
         _playbackStopped = false;
         _currentRunIsSpeech = false;
+        _currentRunIsLiveNarration = false;
         _floatingButtonWindow?.SetResumeAvailable(false);
         SetBusy(_isReplacingLatest);
+        StartLiveNarrationPump();
     }
 
     private void StopCurrentRun()
@@ -1598,6 +1894,12 @@ public partial class MainWindow : Window
 
         if (_currentRun is null)
         {
+            if (_liveNarrationActive && _liveNarrationQueue.Count > 0)
+            {
+                StopLiveNarrationQueue();
+                return;
+            }
+
             _audioPlaybackService.StopAndCollapse();
             _floatingButtonWindow?.SetPlaybackSnapshot(PlaybackSnapshot.Inactive);
             _floatingButtonWindow?.SetResumeAvailable(false);
@@ -1608,6 +1910,12 @@ public partial class MainWindow : Window
         {
             _currentRun.Cancel();
             SetStatus("Остановлено", "Текущее действие прервано.", "#F9C74F", busy: false);
+            return;
+        }
+
+        if (_currentRunIsLiveNarration)
+        {
+            StopLiveNarrationQueue();
             return;
         }
 
@@ -1627,6 +1935,7 @@ public partial class MainWindow : Window
         _dictationRecorderService.Cancel();
         _currentRun?.Cancel();
         _audioPlaybackService.Cancel();
+        _liveNarrationQueue.Clear();
         _floatingButtonWindow?.SetResumeAvailable(false);
     }
 
@@ -1726,12 +2035,14 @@ public partial class MainWindow : Window
         SetAutomationName(SpeakLatestHotkeyButton, SpeakHotkeyLabelText.Text, SpeakHotkeyHintText.Text);
         SetAutomationName(ClipboardHotkeyButton, ClipboardHotkeyLabelText.Text, ClipboardHotkeyHintText.Text);
         SetAutomationName(CodexMicHotkeyButton, CodexMicHotkeyLabelText.Text, CodexMicHotkeyHintText.Text);
+        SetAutomationName(SendVoiceHotkeyButton, SendVoiceHotkeyLabelText.Text, SendVoiceHotkeyHintText.Text);
 
         SetAutomationName(CodexWindowKeywordsBox, CodexWindowKeywordsLabelText.Text, CodexWindowKeywordsHintText.Text);
         SetAutomationName(TestCodexWindowButton, TestCodexWindowButton.Content?.ToString() ?? string.Empty);
         SetAutomationName(HoverCopyButtonToggle, HoverCopyButtonLabelText.Text, HoverCopyButtonHintText.Text);
         SetAutomationName(RestoreClipboardToggle, RestoreClipboardLabelText.Text, RestoreClipboardHintText.Text);
         SetAutomationName(ClipboardFallbackToggle, ClipboardFallbackLabelText.Text, ClipboardFallbackHintText.Text);
+        SetAutomationName(LiveNarrationToggle, LiveNarrationLabelText.Text, LiveNarrationHintText.Text);
         SetAutomationName(RetryMicrophoneToggle, RetryMicrophoneLabelText.Text, RetryMicrophoneHintText.Text);
         SetAutomationName(TestCopyButton, TestCopyButton.Content?.ToString() ?? string.Empty, DiagnosticsHintText.Text);
         SetAutomationName(TestMicrophoneButton, TestMicrophoneButton.Content?.ToString() ?? string.Empty, DiagnosticsHintText.Text);
@@ -1810,11 +2121,15 @@ public partial class MainWindow : Window
             _audioPlaybackService.TogglePause,
             _audioPlaybackService.Seek,
             StopCurrentRun,
+            ToggleLiveNarration,
             _appSettings,
             SaveFloatingButtonPosition);
         _floatingButtonWindow.SetPlaybackSnapshot(_audioPlaybackService.CurrentSnapshot);
         _floatingButtonWindow.SetResumeAvailable(_playbackStopped && _currentRun is not null);
         _floatingButtonWindow.SetDictationState(_dictationRecorderService.IsRecording, _isDictationProcessing);
+        _floatingButtonWindow.SetLiveNarrationState(
+            _appSettings.EnableCodexLiveNarration,
+            _liveNarrationActive);
         ApplyFloatingButtonLocalization();
         _floatingButtonWindow.Show();
     }
@@ -1874,6 +2189,7 @@ public partial class MainWindow : Window
 
     private void DisposeApplicationShell()
     {
+        _liveNarrationMonitor.Dispose();
         _floatingButtonWindow?.Close();
         _floatingButtonWindow = null;
         _hotkeyService.Dispose();
@@ -1890,4 +2206,6 @@ public partial class MainWindow : Window
     }
 
     private sealed record LocalizedOption(string Id, string Label);
+
+    private sealed record LiveNarrationQueueItem(string Text);
 }

@@ -16,6 +16,8 @@ public sealed class AppSettings
 
     public string CodexMicHotkey { get; set; } = string.Empty;
 
+    public string SendVoiceInputHotkey { get; set; } = string.Empty;
+
     public string TranscriptionModel { get; set; } = "gpt-4o-transcribe";
 
     public string TranscriptionLanguage { get; set; } = "auto";
@@ -33,6 +35,8 @@ public sealed class AppSettings
     public bool FallbackToClipboardWhenCopyMissing { get; set; }
 
     public bool RetryMicrophoneIfInactive { get; set; } = true;
+
+    public bool EnableCodexLiveNarration { get; set; } = true;
 
     public bool HideFilePathsInSpeech { get; set; } = true;
 

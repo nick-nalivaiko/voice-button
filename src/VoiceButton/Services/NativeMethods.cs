@@ -24,6 +24,11 @@ internal static class NativeMethods
     public const uint SwpNoOwnerZOrder = 0x0200;
     public const uint SwpNoSendChanging = 0x0400;
     public const ushort VkControl = 0x11;
+    public const ushort VkReturn = 0x0D;
+    public const ushort VkShift = 0x10;
+    public const ushort VkMenu = 0x12;
+    public const ushort VkLeftWindows = 0x5B;
+    public const ushort VkRightWindows = 0x5C;
     public const ushort VkV = 0x56;
 
     public static readonly IntPtr HwndTopmost = new(-1);
@@ -94,6 +99,9 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint inputCount, Input[] inputs, int size);
 
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int virtualKey);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct Input
     {
@@ -153,6 +161,30 @@ internal static class NativeMethods
             CreateKeyInput(VkControl, KeyEventKeyUp)
         };
         return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>()) == inputs.Length;
+    }
+
+    public static bool SendEnterKey()
+    {
+        var inputs = new[]
+        {
+            CreateKeyInput(VkReturn, 0),
+            CreateKeyInput(VkReturn, KeyEventKeyUp)
+        };
+        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>()) == inputs.Length;
+    }
+
+    public static bool AreHotkeyModifiersDown()
+    {
+        return IsVirtualKeyDown(VkControl)
+            || IsVirtualKeyDown(VkShift)
+            || IsVirtualKeyDown(VkMenu)
+            || IsVirtualKeyDown(VkLeftWindows)
+            || IsVirtualKeyDown(VkRightWindows);
+    }
+
+    public static bool IsVirtualKeyDown(int virtualKey)
+    {
+        return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
     }
 
     private static Input CreateKeyInput(ushort virtualKey, uint flags)

@@ -398,11 +398,11 @@ public partial class FloatingButtonWindow : Window
         PlayedWaveformClip.Width = PlayedWaveformWidth * _playbackSnapshot.Progress;
         PlaybackTimeText.Text = FormatTime(_playbackSnapshot.Position);
         LiveNarrationButton.Visibility = _liveNarrationAvailable ? Visibility.Visible : Visibility.Collapsed;
-        LiveNarrationButton.Background = BrushFromHex(_liveNarrationActive ? "#123B72" : "#071528");
-        LiveNarrationButton.BorderBrush = BrushFromHex(_liveNarrationActive ? "#37D0F4" : "#2B8DFF");
-        LiveNarrationGlow.Fill = BrushFromHex(_liveNarrationActive ? "#1D7FFF" : "#123B72");
-        LiveNarrationGlow.Opacity = _liveNarrationActive ? 0.72 : 0.28;
-        LiveNarrationDot.Fill = BrushFromHex(_liveNarrationActive ? "#8AF2FF" : "#8BA4C2");
+        LiveNarrationButton.Background = BrushFromHex(_liveNarrationActive ? "#3A1016" : "#2A1F0E");
+        LiveNarrationButton.BorderBrush = BrushFromHex(_liveNarrationActive ? "#FF5C5C" : "#F0A62E");
+        LiveNarrationGlow.Fill = BrushFromHex(_liveNarrationActive ? "#F25F5C" : "#C97A16");
+        LiveNarrationGlow.Opacity = _liveNarrationActive ? 0.82 : 0.35;
+        LiveNarrationDot.Fill = BrushFromHex(_liveNarrationActive ? "#FFF1F1" : "#FFD166");
         LiveNarrationButton.ToolTip = _liveNarrationActive ? _liveNarrationOnTooltip : _liveNarrationOffTooltip;
         System.Windows.Automation.AutomationProperties.SetName(
             LiveNarrationButton,

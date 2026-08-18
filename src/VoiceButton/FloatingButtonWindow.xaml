@@ -100,11 +100,13 @@
                             <GradientStop Color="#010711" Offset="1" />
                         </RadialGradientBrush>
                     </Border.Background>
-                    <Grid x:Name="CompactSpeakerContent"
-                          Width="25"
-                          Height="25"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center">
+                    <Grid>
+                        <Grid x:Name="CompactSpeakerContent"
+                              Width="25"
+                              Height="25"
+                              Margin="3,0,0,0"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center">
                         <Path Fill="#37D0F4"
                               Data="M 3 9 L 8 9 L 13 5 L 13 19 L 8 15 L 3 15 Z"
                               Stretch="Uniform"
@@ -133,6 +135,39 @@
                               Height="14"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Border x:Name="LiveNarrationButton"
+                                Panel.ZIndex="20"
+                                Width="15"
+                                Height="15"
+                                CornerRadius="3.5"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Bottom"
+                                Margin="3,0,0,3"
+                                Background="#2A1F0E"
+                                BorderBrush="#F0A62E"
+                                BorderThickness="1.2"
+                                Visibility="Collapsed"
+                                ToolTip="Озвучивать ход работы Codex"
+                                MouseLeftButtonDown="LiveNarrationButton_MouseLeftButtonDown">
+                            <Grid>
+                                <Rectangle x:Name="LiveNarrationGlow"
+                                           Margin="1.4"
+                                           RadiusX="2.3"
+                                           RadiusY="2.3"
+                                           Fill="#C97A16"
+                                           Opacity="0.35" />
+                                <Rectangle x:Name="LiveNarrationDot"
+                                           Width="4"
+                                           Height="4"
+                                           RadiusX="1"
+                                           RadiusY="1"
+                                           Fill="#FFD166"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
                     </Grid>
                 </Border>
             </Grid>
@@ -266,30 +301,6 @@
                 </Border>
             </Grid>
 
-            <Border x:Name="LiveNarrationButton"
-                    Panel.ZIndex="20"
-                    Width="17"
-                    Height="17"
-                    CornerRadius="8.5"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    Margin="0,2,2,0"
-                    Background="#071528"
-                    BorderBrush="#2B8DFF"
-                    BorderThickness="1"
-                    Visibility="Collapsed"
-                    ToolTip="Озвучивать ход работы Codex"
-                    MouseLeftButtonDown="LiveNarrationButton_MouseLeftButtonDown">
-                <Grid>
-                    <Ellipse x:Name="LiveNarrationGlow" Margin="1" Fill="#123B72" Opacity="0.28" />
-                    <Ellipse x:Name="LiveNarrationDot"
-                             Width="5"
-                             Height="5"
-                             Fill="#8BA4C2"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center" />
-                </Grid>
-            </Border>
         </Grid>
     </Border>
 </Window>

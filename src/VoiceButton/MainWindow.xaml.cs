@@ -1790,6 +1790,11 @@ public partial class MainWindow : Window
         Activate();
     }
 
+    internal void ShowFromExternalLaunch()
+    {
+        ShowFromTray();
+    }
+
     private void ShowFloatingButton()
     {
         if (!_appSettings.ShowFloatingButton || _floatingButtonWindow is not null)

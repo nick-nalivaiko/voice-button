@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
 using VoiceButton.Models;
 using VoiceButton.Services;
@@ -19,6 +20,7 @@ public partial class FloatingButtonWindow : Window
     private const double DividerWidth = 1;
     private const double SeekZoneWidth = 186;
     private const double PlayedWaveformWidth = 135;
+    private static readonly TimeSpan TopmostRefreshInterval = TimeSpan.FromSeconds(5);
 
     private readonly Action _startVoiceInput;
     private readonly Action _resumePlayback;
@@ -29,6 +31,7 @@ public partial class FloatingButtonWindow : Window
     private readonly Action _stop;
     private readonly Action<double, double> _savePosition;
     private readonly AppSettings _settings;
+    private readonly DispatcherTimer _topmostTimer;
 
     private PlaybackSnapshot _playbackSnapshot = PlaybackSnapshot.Inactive;
     private bool _isPlaybackActive;
@@ -44,6 +47,7 @@ public partial class FloatingButtonWindow : Window
     private string _playingPlaybackTooltip = "Пауза / перемотка / стоп";
     private double _compactRight;
     private double _compactTop;
+    private IntPtr _windowHandle;
 
     public FloatingButtonWindow(
         Action startVoiceInput,
@@ -66,14 +70,22 @@ public partial class FloatingButtonWindow : Window
         _stop = stop;
         _settings = settings;
         _savePosition = savePosition;
+        _topmostTimer = new DispatcherTimer
+        {
+            Interval = TopmostRefreshInterval
+        };
+        _topmostTimer.Tick += TopmostTimer_Tick;
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        KeepTargetApplicationActive();
+        _windowHandle = new WindowInteropHelper(this).Handle;
+        ConfigureNonActivatingWindow();
         ApplyInitialPosition();
         UpdateContentClip();
         ApplyPlaybackVisual();
+        ReassertTopmost();
+        _topmostTimer.Start();
     }
 
     private void ContentClip_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -95,14 +107,47 @@ public partial class FloatingButtonWindow : Window
             radius);
     }
 
-    private void KeepTargetApplicationActive()
+    protected override void OnClosed(EventArgs e)
     {
-        var handle = new WindowInteropHelper(this).Handle;
-        var currentStyle = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
+        _topmostTimer.Stop();
+        base.OnClosed(e);
+    }
+
+    private void ConfigureNonActivatingWindow()
+    {
+        var currentStyle = NativeMethods.GetWindowLongPtr(_windowHandle, NativeMethods.GwlExStyle).ToInt64();
         _ = NativeMethods.SetWindowLongPtr(
-            handle,
+            _windowHandle,
             NativeMethods.GwlExStyle,
             new IntPtr(currentStyle | NativeMethods.WsExNoActivate));
+    }
+
+    private void TopmostTimer_Tick(object? sender, EventArgs e)
+    {
+        ReassertTopmost();
+    }
+
+    private void ReassertTopmost()
+    {
+        if (_windowHandle == IntPtr.Zero
+            || !IsVisible
+            || !NativeMethods.IsWindow(_windowHandle))
+        {
+            return;
+        }
+
+        _ = NativeMethods.SetWindowPos(
+            _windowHandle,
+            NativeMethods.HwndTopmost,
+            0,
+            0,
+            0,
+            0,
+            NativeMethods.SwpNoMove
+            | NativeMethods.SwpNoSize
+            | NativeMethods.SwpNoActivate
+            | NativeMethods.SwpNoOwnerZOrder
+            | NativeMethods.SwpNoSendChanging);
     }
 
     private void ButtonShell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

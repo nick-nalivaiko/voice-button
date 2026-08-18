@@ -18,8 +18,15 @@ internal static class NativeMethods
     public const uint MouseEventLeftUp = 0x0004;
     public const uint InputKeyboard = 1;
     public const uint KeyEventKeyUp = 0x0002;
+    public const uint SwpNoSize = 0x0001;
+    public const uint SwpNoMove = 0x0002;
+    public const uint SwpNoActivate = 0x0010;
+    public const uint SwpNoOwnerZOrder = 0x0200;
+    public const uint SwpNoSendChanging = 0x0400;
     public const ushort VkControl = 0x11;
     public const ushort VkV = 0x56;
+
+    public static readonly IntPtr HwndTopmost = new(-1);
 
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
@@ -55,6 +62,16 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     public static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);

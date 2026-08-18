@@ -24,6 +24,7 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **Portable-friendly security**: API keys saved in the UI are stored in Windows Credential Manager, not inside the portable folder.
 - **Three interface languages**: English, Ukrainian, and Russian, selected from the Windows UI language on first launch.
 - **Tray support**: minimize to tray, optional Windows startup, remembered floating-button position, and local diagnostics.
+- **Stable desktop behavior**: only one instance can run per Windows session, and the floating control periodically restores its always-on-top state without taking focus.
 
 ## Floating controls
 

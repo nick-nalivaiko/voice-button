@@ -192,6 +192,12 @@ public partial class MainWindow : Window
 
         _hotkeyService.Pressed += (_, actionId) => RunHotkeyAction(actionId);
         RegisterConfiguredHotkeys();
+
+        // STARTUPINFO can mark a process hidden even though WPF has shown its window.
+        // Restore through Win32 after initialization so shortcuts and external activation stay visible.
+        _ = Dispatcher.BeginInvoke(
+            ShowFromTray,
+            System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     private void SettingsScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -2096,9 +2102,21 @@ public partial class MainWindow : Window
 
     private void ShowFromTray()
     {
-        Show();
+        if (!IsVisible)
+        {
+            Show();
+        }
+
         WindowState = WindowState.Normal;
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero)
+        {
+            _ = NativeMethods.ShowWindow(handle, NativeMethods.SwRestore);
+            _ = NativeMethods.SetForegroundWindow(handle);
+        }
+
         Activate();
+        Focus();
     }
 
     internal void ShowFromExternalLaunch()

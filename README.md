@@ -18,7 +18,7 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **Real playback controls**: pause/resume, waveform seeking, elapsed time, and stop.
 - **Live Codex narration**: an optional attached corner control follows complete visible Codex work paragraphs, skips service activity labels, and plays each paragraph through the same seekable player.
 - **Universal dictation**: records speech, transcribes it with OpenAI, and inserts it into the focused input field or leaves it in the clipboard.
-- **Global hotkeys**: five configurable shortcuts cover the latest answer, clipboard speech, context-aware microphone action, sending recorded assistant input with Enter, and toggling live narration.
+- **Global hotkeys**: five configurable shortcuts cover the latest answer, clipboard speech, context-aware microphone action, sending recorded assistant input with Enter, and pausing or resuming live narration.
 - **Clipboard protection**: restores the previous clipboard value when possible.
 - **Speech cleanup**: removes or shortens paths, code, links, secrets, hashes, stack traces, tables, structured data, shell commands, and long numeric identifiers.
 - **Long-answer support**: sanitizes and chunks long replies before sequential playback.
@@ -67,7 +67,7 @@ Codex and ChatGPT are explicit exceptions: the microphone action keeps using the
 
 Click a shortcut field and press the desired key combination. Changes are registered globally and saved automatically.
 
-The fourth action sends the current built-in Codex or ChatGPT voice input by delivering Enter to the active assistant window. The fifth toggles live Codex narration without opening settings.
+The fourth action sends the current built-in Codex or ChatGPT voice input by delivering Enter to the active assistant window. The fifth pauses or resumes live Codex narration without opening settings or losing its queue.
 
 ![Hotkey settings](docs/screenshots/hotkeys.png)
 
@@ -161,7 +161,7 @@ git config core.hooksPath .githooks
 6. The player and decoder receive a minimum two-second warm-up; each MP3 response then begins from a ten-second buffer, or as soon as a shorter clip is complete, while the remaining audio continues to arrive.
 7. Audio is played in order through the floating seekable player, with automatic rebuffering when needed.
 
-When live Codex narration is enabled globally, Voice Button watches the visible accessibility tree for the current Codex work block. The attached corner control starts or stops automatic narration. Complete paragraphs are queued in order, inline language fragments remain in the same paragraph, and Codex activity labels such as `Run a command` or `Edited files` are skipped. Paragraphs are sanitized by the same speech filters and played one at a time through the existing player. Pausing preserves the exact position and pending paragraphs; stopping discards the current live queue while leaving the mode ready for the next new paragraph.
+When live Codex narration is enabled globally, Voice Button watches the visible accessibility tree for the current Codex work block. The attached corner control and its global hotkey pause or resume narration without losing the current position or queued paragraphs. Only assistant text below the active work marker and inside the assistant column is accepted, so user message bubbles and neighboring panels are ignored. Complete paragraphs are queued in order, inline language fragments remain in the same paragraph, and Codex activity labels such as `Run a command` or `Edited files` are skipped. Paragraphs are sanitized by the same speech filters and played one at a time through the existing player. Only the player's Stop button discards the current live queue while leaving the mode ready for the next new paragraph.
 
 The primary answer-reading path does not use screenshots or OCR.
 

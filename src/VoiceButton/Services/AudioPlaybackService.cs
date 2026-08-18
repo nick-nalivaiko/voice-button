@@ -85,6 +85,17 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
         session?.TogglePause();
     }
 
+    public void SetPaused(bool paused)
+    {
+        StreamingPlaybackSession? session;
+        lock (_gate)
+        {
+            session = _currentSession;
+        }
+
+        session?.SetPaused(paused);
+    }
+
     public void Seek(double progress)
     {
         StreamingPlaybackSession? session;
@@ -221,21 +232,37 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
 
         public void TogglePause()
         {
-            WaveOutEvent? output;
-            bool shouldPlay;
+            bool paused;
             lock (_gate)
             {
-                if (_provider is null || _transportStopped || _disposed)
+                if (_transportStopped || _disposed)
                 {
                     return;
                 }
 
-                _userPaused = !_userPaused;
-                output = _output;
-                shouldPlay = !_userPaused && _started && CanResumeLocked();
+                paused = !_userPaused;
             }
 
-            if (_userPaused)
+            SetPaused(paused);
+        }
+
+        public void SetPaused(bool paused)
+        {
+            WaveOutEvent? output;
+            bool shouldPlay;
+            lock (_gate)
+            {
+                if (_transportStopped || _disposed)
+                {
+                    return;
+                }
+
+                _userPaused = paused;
+                output = _output;
+                shouldPlay = !paused && _started && CanResumeLocked();
+            }
+
+            if (paused)
             {
                 SafePause(output);
             }

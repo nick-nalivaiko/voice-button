@@ -15,7 +15,7 @@ public partial class FloatingButtonWindow : Window
     private const double ResumeCompactWidth = 136;
     private const double ResumeZoneWidth = 48;
     private const double PlayerWidth = 274;
-    private const double LiveTabOverhang = 8;
+    private const double LiveTabOverhang = 9;
     private const double EdgePadding = 18;
     private const double ControlZoneWidth = 43;
     private const double DividerWidth = 1;

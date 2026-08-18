@@ -1174,8 +1174,7 @@ public partial class MainWindow : Window
 
         if (_liveNarrationActive)
         {
-            DisableLiveNarration();
-            SetStatus(Tr("LiveNarrationOff"), Tr("LiveNarrationOffDetail"), "#F9C74F", busy: false);
+            PauseLiveNarration();
             return;
         }
 
@@ -1183,6 +1182,11 @@ public partial class MainWindow : Window
         {
             EnsureApiKeyReady();
             _liveNarrationActive = true;
+            if (_currentRunIsLiveNarration)
+            {
+                _audioPlaybackService.SetPaused(false);
+            }
+
             _floatingButtonWindow?.SetLiveNarrationState(available: true, active: true);
             QueueLiveNarrationSnapshot(_liveNarrationSnapshot);
             SetStatus(Tr("LiveNarrationOn"), Tr("LiveNarrationOnDetail"), "#41D6A1", busy: false);
@@ -1191,6 +1195,18 @@ public partial class MainWindow : Window
         {
             SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
         }
+    }
+
+    private void PauseLiveNarration()
+    {
+        _liveNarrationActive = false;
+        if (_currentRunIsLiveNarration)
+        {
+            _audioPlaybackService.SetPaused(true);
+        }
+
+        _floatingButtonWindow?.SetLiveNarrationState(available: true, active: false);
+        SetStatus(Tr("LiveNarrationPaused"), Tr("LiveNarrationPausedDetail"), "#F9C74F", busy: false);
     }
 
     private void DisableLiveNarration()

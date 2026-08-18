@@ -20,6 +20,9 @@ public sealed class CodexLiveNarrationMonitor(
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(850);
     private static readonly TimeSpan SessionDisappearDelay = TimeSpan.FromSeconds(4);
+    private const double AssistantColumnLeftTolerance = 48;
+    private const double AssistantColumnAnchorWidth = 96;
+    private const double InlineFragmentGap = 48;
 
     private readonly object _gate = new();
     private CancellationTokenSource? _run;
@@ -153,7 +156,7 @@ public sealed class CodexLiveNarrationMonitor(
         var activeMarkers = FindMarkers(descendants, LooksLikeActiveMarker);
         if (activeMarkers.Count > 0)
         {
-            var marker = activeMarkers[^1];
+            var marker = FindLatestMarker(activeMarkers);
             var scope = FindResponseScope(window.Element, marker);
             return new LiveExtraction(
                 GetRuntimeKey(scope),
@@ -325,6 +328,17 @@ public sealed class CodexLiveNarrationMonitor(
         return markers;
     }
 
+    private static AutomationElement FindLatestMarker(IReadOnlyList<AutomationElement> markers)
+    {
+        return markers
+            .Select((element, index) => new { Element = element, Index = index, Bounds = SafeBounds(element) })
+            .OrderBy(candidate => candidate.Bounds.IsEmpty ? 0 : 1)
+            .ThenBy(candidate => candidate.Bounds.Bottom)
+            .ThenBy(candidate => candidate.Index)
+            .Last()
+            .Element;
+    }
+
     private static AutomationElement FindResponseScope(AutomationElement root, AutomationElement marker)
     {
         var rootBounds = SafeBounds(root);
@@ -390,7 +404,7 @@ public sealed class CodexLiveNarrationMonitor(
                 break;
             }
 
-            if ((type == ControlType.Text || type == ControlType.Document)
+            if (IsLeafTextElement(element, type)
                 && IsNarrationText(SafeName(element)))
             {
                 count++;
@@ -404,8 +418,8 @@ public sealed class CodexLiveNarrationMonitor(
     {
         var elements = FindAllElements(scope);
         var markerSeen = false;
+        var markerBounds = SafeBounds(marker);
         var fragments = new List<NarrationFragment>();
-        var unique = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (AutomationElement element in elements)
         {
@@ -427,27 +441,109 @@ public sealed class CodexLiveNarrationMonitor(
             }
 
             var type = SafeControlType(element);
-            if (type != ControlType.Text && type != ControlType.Document)
+            if (!IsLeafTextElement(element, type))
             {
                 continue;
             }
 
+            var bounds = SafeBounds(element);
             var segments = SplitParagraphs(name).ToArray();
             for (var index = 0; index < segments.Length; index++)
             {
                 var segment = segments[index];
-                if (IsNarrationText(segment) && unique.Add(segment))
+                if (!IsNarrationText(segment))
                 {
-                    fragments.Add(new NarrationFragment(
-                        segment,
-                        SafeBounds(element),
-                        GetTextContainerKey(element, scope),
-                        ForceBreakBefore: index > 0));
+                    continue;
                 }
+
+                var fragment = new NarrationFragment(
+                    segment,
+                    bounds,
+                    GetTextContainerKey(element, scope),
+                    ForceBreakBefore: index > 0);
+                if (!IsAssistantFlowFragment(fragment, fragments, markerBounds)
+                    || IsDuplicateFragment(fragment, fragments))
+                {
+                    continue;
+                }
+
+                fragments.Add(fragment);
             }
         }
 
         return MergeInlineFragments(fragments);
+    }
+
+    private static bool IsLeafTextElement(AutomationElement element, ControlType type)
+    {
+        if (type == ControlType.Text)
+        {
+            return true;
+        }
+
+        if (type != ControlType.Document)
+        {
+            return false;
+        }
+
+        try
+        {
+            return element.FindFirst(
+                TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)) is null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsAssistantFlowFragment(
+        NarrationFragment fragment,
+        IReadOnlyList<NarrationFragment> accepted,
+        WpfRect markerBounds)
+    {
+        if (markerBounds.IsEmpty)
+        {
+            return true;
+        }
+
+        var bounds = fragment.Bounds;
+        if (bounds.IsEmpty
+            || bounds.Bottom <= markerBounds.Bottom + 1
+            || bounds.Right < markerBounds.Left - AssistantColumnLeftTolerance)
+        {
+            return false;
+        }
+
+        if (bounds.Left <= markerBounds.Left + AssistantColumnAnchorWidth)
+        {
+            return true;
+        }
+
+        return accepted
+            .TakeLast(8)
+            .Any(previous => IsSameLineAdjacent(previous.Bounds, bounds));
+    }
+
+    private static bool IsDuplicateFragment(
+        NarrationFragment candidate,
+        IReadOnlyList<NarrationFragment> accepted)
+    {
+        return accepted
+            .TakeLast(4)
+            .Any(previous => string.Equals(previous.Text, candidate.Text, StringComparison.Ordinal)
+                && BoundsNearlyEqual(previous.Bounds, candidate.Bounds));
+    }
+
+    private static bool BoundsNearlyEqual(WpfRect left, WpfRect right)
+    {
+        return !left.IsEmpty
+            && !right.IsEmpty
+            && Math.Abs(left.Left - right.Left) <= 1
+            && Math.Abs(left.Top - right.Top) <= 1
+            && Math.Abs(left.Width - right.Width) <= 2
+            && Math.Abs(left.Height - right.Height) <= 2;
     }
 
     private static List<AutomationElement> FindAllElements(AutomationElement scope)
@@ -538,10 +634,13 @@ public sealed class CodexLiveNarrationMonitor(
         var paragraphs = new List<string>();
         NarrationFragment? previous = null;
         var current = string.Empty;
+        var paragraphLeft = 0d;
 
         foreach (var fragment in fragments)
         {
-            if (previous is null || fragment.ForceBreakBefore || !ShouldJoin(previous, fragment))
+            if (previous is null
+                || fragment.ForceBreakBefore
+                || !ShouldJoin(previous, fragment, paragraphLeft))
             {
                 if (!string.IsNullOrWhiteSpace(current))
                 {
@@ -549,6 +648,7 @@ public sealed class CodexLiveNarrationMonitor(
                 }
 
                 current = fragment.Text;
+                paragraphLeft = fragment.Bounds.IsEmpty ? 0 : fragment.Bounds.Left;
             }
             else
             {
@@ -566,26 +666,42 @@ public sealed class CodexLiveNarrationMonitor(
         return paragraphs;
     }
 
-    private static bool ShouldJoin(NarrationFragment previous, NarrationFragment current)
+    private static bool ShouldJoin(
+        NarrationFragment previous,
+        NarrationFragment current,
+        double paragraphLeft)
     {
         if (!previous.Bounds.IsEmpty && !current.Bounds.IsEmpty)
         {
-            var verticalOverlap = current.Bounds.Top <= previous.Bounds.Bottom + 2
-                && current.Bounds.Bottom >= previous.Bounds.Top - 2;
-            if (verticalOverlap)
+            if (IsSameLineAdjacent(previous.Bounds, current.Bounds))
             {
                 return true;
             }
 
             var verticalGap = current.Bounds.Top - previous.Bounds.Bottom;
             return verticalGap >= -2
-                && verticalGap <= 6
-                && !string.IsNullOrWhiteSpace(previous.ContainerKey)
-                && string.Equals(previous.ContainerKey, current.ContainerKey, StringComparison.Ordinal);
+                && verticalGap <= 4
+                && (paragraphLeft == 0 || Math.Abs(current.Bounds.Left - paragraphLeft) <= 36);
         }
 
         return !string.IsNullOrWhiteSpace(previous.ContainerKey)
             && string.Equals(previous.ContainerKey, current.ContainerKey, StringComparison.Ordinal);
+    }
+
+    private static bool IsSameLineAdjacent(WpfRect previous, WpfRect current)
+    {
+        if (previous.IsEmpty || current.IsEmpty)
+        {
+            return false;
+        }
+
+        var verticalOverlap = current.Top <= previous.Bottom + 2
+            && current.Bottom >= previous.Top - 2;
+        var horizontalGap = current.Left - previous.Right;
+        return verticalOverlap
+            && current.Left >= previous.Left - 4
+            && horizontalGap >= -4
+            && horizontalGap <= InlineFragmentGap;
     }
 
     private static bool NeedsSpace(string previous, string current)

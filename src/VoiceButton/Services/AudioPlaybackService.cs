@@ -162,6 +162,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
     private sealed class StreamingPlaybackSession(Action<PlaybackSnapshot> publishSnapshot, float outputVolume, bool startStopped) : IDisposable
     {
         private static readonly TimeSpan InitialBuffer = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan MinimumStartupDelay = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan MinimumBuffer = TimeSpan.FromSeconds(4.5);
         private static readonly TimeSpan ResumeBuffer = TimeSpan.FromSeconds(8);
 
@@ -171,6 +172,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
         private CancellationTokenSource? _runCancellation;
         private Exception? _decodeError;
         private Exception? _playbackError;
+        private DateTime _providerReadyUtc;
         private bool _downloadComplete;
         private bool _started;
         private bool _userPaused;
@@ -434,6 +436,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                         lock (_gate)
                         {
                             _provider = provider;
+                            _providerReadyUtc = DateTime.UtcNow;
                         }
 
                         PublishCurrentSnapshot();
@@ -523,8 +526,12 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                 lock (_gate)
                 {
                     playbackError = _playbackError;
+                    var startupDelayElapsed = _providerReadyUtc != default
+                        && DateTime.UtcNow - _providerReadyUtc >= MinimumStartupDelay;
 
-                    if (!_started && (state.DownloadedDuration >= InitialBuffer || state.IsComplete))
+                    if (!_started
+                        && startupDelayElapsed
+                        && (state.DownloadedDuration >= InitialBuffer || state.IsComplete))
                     {
                         _started = true;
                         _buffering = false;

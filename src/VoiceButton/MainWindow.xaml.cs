@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private const string ClipboardHotkeyId = "Clipboard";
     private const string CodexMicHotkeyId = "CodexMic";
     private const string SendVoiceHotkeyId = "SendVoice";
+    private const string ToggleLiveNarrationHotkeyId = "ToggleLiveNarration";
 
     private readonly VoiceButtonSettings _settings = new();
     private readonly AppSettingsStore _appSettingsStore = new();
@@ -465,6 +466,9 @@ public partial class MainWindow : Window
             case SendVoiceHotkeyId:
                 _ = SendVoiceInputAsync();
                 break;
+            case ToggleLiveNarrationHotkeyId:
+                ToggleLiveNarration();
+                break;
         }
     }
 
@@ -498,6 +502,7 @@ public partial class MainWindow : Window
         AddHotkeyRegistration(registrations, ClipboardHotkeyId, ClipboardHotkeyLabelText.Text, _appSettings.SpeakClipboardHotkey);
         AddHotkeyRegistration(registrations, CodexMicHotkeyId, CodexMicHotkeyLabelText.Text, _appSettings.CodexMicHotkey);
         AddHotkeyRegistration(registrations, SendVoiceHotkeyId, SendVoiceHotkeyLabelText.Text, _appSettings.SendVoiceInputHotkey);
+        AddHotkeyRegistration(registrations, ToggleLiveNarrationHotkeyId, ToggleLiveHotkeyLabelText.Text, _appSettings.ToggleLiveNarrationHotkey);
         return registrations;
     }
 
@@ -515,6 +520,7 @@ public partial class MainWindow : Window
         ClipboardHotkeyButton.Content = _capturingHotkeyId == ClipboardHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.SpeakClipboardHotkey);
         CodexMicHotkeyButton.Content = _capturingHotkeyId == CodexMicHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.CodexMicHotkey);
         SendVoiceHotkeyButton.Content = _capturingHotkeyId == SendVoiceHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.SendVoiceInputHotkey);
+        ToggleLiveHotkeyButton.Content = _capturingHotkeyId == ToggleLiveNarrationHotkeyId ? Tr("PressHotkeyButton") : GetHotkeyDisplay(_appSettings.ToggleLiveNarrationHotkey);
     }
 
     private bool IsDuplicateHotkey(string currentHotkeyId, string value)
@@ -525,7 +531,8 @@ public partial class MainWindow : Window
                 (Id: SpeakLatestHotkeyId, Value: _appSettings.SpeakLatestHotkey),
                 (Id: ClipboardHotkeyId, Value: _appSettings.SpeakClipboardHotkey),
                 (Id: CodexMicHotkeyId, Value: _appSettings.CodexMicHotkey),
-                (Id: SendVoiceHotkeyId, Value: _appSettings.SendVoiceInputHotkey)
+                (Id: SendVoiceHotkeyId, Value: _appSettings.SendVoiceInputHotkey),
+                (Id: ToggleLiveNarrationHotkeyId, Value: _appSettings.ToggleLiveNarrationHotkey)
             }.Any(item => item.Id != currentHotkeyId
                 && HotkeyGesture.TryParse(item.Value, out var existing)
                 && string.Equals(existing.StorageValue, gesture.StorageValue, StringComparison.OrdinalIgnoreCase));
@@ -543,6 +550,7 @@ public partial class MainWindow : Window
             ClipboardHotkeyId => ClipboardHotkeyButton,
             CodexMicHotkeyId => CodexMicHotkeyButton,
             SendVoiceHotkeyId => SendVoiceHotkeyButton,
+            ToggleLiveNarrationHotkeyId => ToggleLiveHotkeyButton,
             _ => SpeakLatestHotkeyButton
         };
     }
@@ -554,6 +562,7 @@ public partial class MainWindow : Window
             ClipboardHotkeyId => _appSettings.SpeakClipboardHotkey,
             CodexMicHotkeyId => _appSettings.CodexMicHotkey,
             SendVoiceHotkeyId => _appSettings.SendVoiceInputHotkey,
+            ToggleLiveNarrationHotkeyId => _appSettings.ToggleLiveNarrationHotkey,
             _ => _appSettings.SpeakLatestHotkey
         };
     }
@@ -570,6 +579,9 @@ public partial class MainWindow : Window
                 break;
             case SendVoiceHotkeyId:
                 _appSettings.SendVoiceInputHotkey = value;
+                break;
+            case ToggleLiveNarrationHotkeyId:
+                _appSettings.ToggleLiveNarrationHotkey = value;
                 break;
             default:
                 _appSettings.SpeakLatestHotkey = value;
@@ -1156,6 +1168,7 @@ public partial class MainWindow : Window
     {
         if (!_appSettings.EnableCodexLiveNarration)
         {
+            SetStatus(Tr("LiveNarrationUnavailable"), Tr("LiveNarrationUnavailableDetail"), "#F9C74F", busy: false);
             return;
         }
 
@@ -1253,7 +1266,7 @@ public partial class MainWindow : Window
                 try
                 {
                     SetStatus(Tr("LiveNarrationSpeaking"), Tr("LiveNarrationParagraphDetail"), "#41D6A1", busy: true);
-                    await SpeakTextAsync(paragraph.Text, cancellationToken);
+                    await SpeakTextAsync(paragraph.Text, cancellationToken, keepAsSingleChunk: true);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1764,10 +1777,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task SpeakTextAsync(string text, CancellationToken cancellationToken)
+    private async Task SpeakTextAsync(
+        string text,
+        CancellationToken cancellationToken,
+        bool keepAsSingleChunk = false)
     {
         var speakableText = TtsTextSanitizer.Sanitize(text, TtsTextSanitizerOptions.FromSettings(_appSettings));
-        var chunks = TextChunker.Split(speakableText, _settings.MaxChunkLength);
+        IReadOnlyList<string> chunks = keepAsSingleChunk
+            ? [speakableText]
+            : TextChunker.Split(speakableText, _settings.MaxChunkLength);
         if (chunks.Count == 0)
         {
             throw new InvalidOperationException("Нет текста для озвучки.");
@@ -2042,6 +2060,7 @@ public partial class MainWindow : Window
         SetAutomationName(ClipboardHotkeyButton, ClipboardHotkeyLabelText.Text, ClipboardHotkeyHintText.Text);
         SetAutomationName(CodexMicHotkeyButton, CodexMicHotkeyLabelText.Text, CodexMicHotkeyHintText.Text);
         SetAutomationName(SendVoiceHotkeyButton, SendVoiceHotkeyLabelText.Text, SendVoiceHotkeyHintText.Text);
+        SetAutomationName(ToggleLiveHotkeyButton, ToggleLiveHotkeyLabelText.Text, ToggleLiveHotkeyHintText.Text);
 
         SetAutomationName(CodexWindowKeywordsBox, CodexWindowKeywordsLabelText.Text, CodexWindowKeywordsHintText.Text);
         SetAutomationName(TestCodexWindowButton, TestCodexWindowButton.Content?.ToString() ?? string.Empty);

@@ -892,7 +892,7 @@
                                     <TextBlock x:Name="SpeakHotkeyHintText" Style="{StaticResource FieldHint}" Text="Копирует последний ответ активного Codex или ChatGPT и запускает озвучку." />
                                 </StackPanel>
                                 <Button x:Name="SpeakLatestHotkeyButton" Grid.Column="2" Tag="SpeakLatest" Style="{StaticResource SecondaryButton}" Content="Ctrl + Alt + V" Click="HotkeyButton_Click" />
-                                <Button x:Name="ClearSpeakLatestHotkeyButton" Grid.Column="3" Tag="SpeakLatest" Style="{StaticResource SecondaryButton}" Content="Сброс" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
+                                <Button x:Name="ClearSpeakLatestHotkeyButton" Grid.Column="3" Tag="SpeakLatest" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
                             </Grid>
 
                             <Grid Margin="0,0,0,18">
@@ -917,7 +917,7 @@
                                 <Button x:Name="ClearCodexMicHotkeyButton" Grid.Column="3" Tag="CodexMic" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
                             </Grid>
 
-                            <Grid Margin="0,0,0,24">
+                            <Grid Margin="0,0,0,18">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /><ColumnDefinition Width="124" /></Grid.ColumnDefinitions>
                                 <TextBlock Style="{StaticResource RowIcon}" Text="&#xE724;" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -926,6 +926,17 @@
                                 </StackPanel>
                                 <Button x:Name="SendVoiceHotkeyButton" Grid.Column="2" Tag="SendVoice" Style="{StaticResource SecondaryButton}" Content="Не назначено" Click="HotkeyButton_Click" />
                                 <Button x:Name="ClearSendVoiceHotkeyButton" Grid.Column="3" Tag="SendVoice" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /><ColumnDefinition Width="124" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource RowIcon}" Text="&#xE767;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ToggleLiveHotkeyLabelText" Style="{StaticResource FieldLabel}" Text="Включить / выключить live-озвучку" />
+                                    <TextBlock x:Name="ToggleLiveHotkeyHintText" Style="{StaticResource FieldHint}" Text="Переключает автоматическую озвучку новых абзацев Codex." />
+                                </StackPanel>
+                                <Button x:Name="ToggleLiveHotkeyButton" Grid.Column="2" Tag="ToggleLiveNarration" Style="{StaticResource SecondaryButton}" Content="Не назначено" Click="HotkeyButton_Click" />
+                                <Button x:Name="ClearToggleLiveHotkeyButton" Grid.Column="3" Tag="ToggleLiveNarration" Style="{StaticResource SecondaryButton}" Content="Очистить" Margin="12,0,0,0" Click="ClearHotkeyButton_Click" />
                             </Grid>
 
                             <Border Style="{StaticResource InfoCard}" MaxWidth="720" HorizontalAlignment="Left">

@@ -18,6 +18,8 @@ public sealed class AppSettings
 
     public string SendVoiceInputHotkey { get; set; } = string.Empty;
 
+    public string ToggleLiveNarrationHotkey { get; set; } = string.Empty;
+
     public string TranscriptionModel { get; set; } = "gpt-4o-transcribe";
 
     public string TranscriptionLanguage { get; set; } = "auto";

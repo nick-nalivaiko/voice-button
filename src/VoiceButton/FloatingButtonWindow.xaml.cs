@@ -15,6 +15,7 @@ public partial class FloatingButtonWindow : Window
     private const double ResumeCompactWidth = 136;
     private const double ResumeZoneWidth = 48;
     private const double PlayerWidth = 274;
+    private const double LiveTabOverhang = 8;
     private const double EdgePadding = 18;
     private const double ControlZoneWidth = 43;
     private const double DividerWidth = 1;
@@ -159,7 +160,8 @@ public partial class FloatingButtonWindow : Window
 
     private void ButtonShell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        var clickPoint = e.GetPosition(this);
+        var clickPoint = e.GetPosition(ButtonShell);
+        var controlWidth = ButtonShell.ActualWidth;
 
         if (_isPlaybackActive)
         {
@@ -167,7 +169,7 @@ public partial class FloatingButtonWindow : Window
             {
                 _togglePause();
             }
-            else if (clickPoint.X >= Width - ControlZoneWidth)
+            else if (clickPoint.X >= controlWidth - ControlZoneWidth)
             {
                 _stop();
             }
@@ -196,7 +198,7 @@ public partial class FloatingButtonWindow : Window
 
         ClampToWorkArea();
         UpdateCompactAnchor();
-        _savePosition(_compactRight - IdleCompactWidth, _compactTop);
+        _savePosition(_compactRight - IdleCompactWindowWidth, _compactTop + LiveTabOverhang);
 
         var moved = Math.Abs(Left - startLeft) > 3 || Math.Abs(Top - startTop) > 3;
         if (moved)
@@ -211,7 +213,7 @@ public partial class FloatingButtonWindow : Window
                 _startVoiceInput();
             }
         }
-        else if (!_canResumePlayback || clickPoint.X >= Width - ControlZoneWidth)
+        else if (!_canResumePlayback || clickPoint.X >= controlWidth - ControlZoneWidth)
         {
             if (!_dictationRecording && !_dictationProcessing)
             {
@@ -231,7 +233,7 @@ public partial class FloatingButtonWindow : Window
             return;
         }
 
-        SeekFromPoint(e.GetPosition(this).X);
+        SeekFromPoint(e.GetPosition(ButtonShell).X);
         e.Handled = true;
     }
 
@@ -261,7 +263,7 @@ public partial class FloatingButtonWindow : Window
             return;
         }
 
-        SeekFromPoint(e.GetPosition(this).X);
+        SeekFromPoint(e.GetPosition(ButtonShell).X);
         _isSeeking = false;
         ButtonShell.ReleaseMouseCapture();
         e.Handled = true;
@@ -424,8 +426,8 @@ public partial class FloatingButtonWindow : Window
         if (active)
         {
             UpdateCompactAnchor();
-            Width = PlayerWidth;
-            Left = _compactRight - PlayerWidth;
+            Width = PlayerWindowWidth;
+            Left = _compactRight - PlayerWindowWidth;
             Top = _compactTop;
         }
         else
@@ -456,7 +458,11 @@ public partial class FloatingButtonWindow : Window
         _compactTop = Top;
     }
 
-    private double CurrentCompactWidth => _canResumePlayback ? ResumeCompactWidth : IdleCompactWidth;
+    private double CurrentCompactWidth => (_canResumePlayback ? ResumeCompactWidth : IdleCompactWidth) + LiveTabOverhang;
+
+    private static double IdleCompactWindowWidth => IdleCompactWidth + LiveTabOverhang;
+
+    private static double PlayerWindowWidth => PlayerWidth + LiveTabOverhang;
 
     private void SeekFromPoint(double x)
     {
@@ -470,8 +476,10 @@ public partial class FloatingButtonWindow : Window
         var workArea = SystemParameters.WorkArea;
         Width = CurrentCompactWidth;
         var idleLeft = _settings.FloatingButtonLeft ?? workArea.Right - IdleCompactWidth - 24;
-        Left = idleLeft + IdleCompactWidth - Width;
-        Top = _settings.FloatingButtonTop ?? workArea.Bottom - Height - 24;
+        Left = idleLeft + IdleCompactWindowWidth - Width;
+        Top = _settings.FloatingButtonTop is double savedTop
+            ? savedTop - LiveTabOverhang
+            : workArea.Bottom - Height - 24;
         ClampToWorkArea();
         UpdateCompactAnchor();
     }

@@ -77,6 +77,10 @@ public partial class MainWindow
         ["FloatingPlayTooltip"] = new[] { "Пауза / перемотка / стоп", "Пауза / перемотування / стоп", "Pause / seek / stop" },
         ["FloatingLiveOffTooltip"] = new[] { "Запустить или продолжить live-озвучку", "Запустити або продовжити live-озвучення", "Start or resume live narration" },
         ["FloatingLiveOnTooltip"] = new[] { "Приостановить live-озвучку", "Призупинити live-озвучення", "Pause live narration" },
+        ["FloatingPreviousAnswerTooltip"] = new[] { "Предыдущий готовый ответ", "Попередня готова відповідь", "Previous completed answer" },
+        ["FloatingNextAnswerTooltip"] = new[] { "Следующий готовый ответ", "Наступна готова відповідь", "Next completed answer" },
+        ["FloatingPreviousLiveTooltip"] = new[] { "Предыдущий промежуточный диалог", "Попередній проміжний діалог", "Previous live paragraph" },
+        ["FloatingNextLiveTooltip"] = new[] { "Следующий промежуточный диалог", "Наступний проміжний діалог", "Next live paragraph" },
         ["OpenAiSectionTitle"] = new[] { "OpenAI", "OpenAI", "OpenAI" },
         ["ProviderLabel"] = new[] { "Поставщик", "Постачальник", "Provider" },
         ["ApiKeyLabel"] = new[] { "OpenAI API key", "OpenAI API key", "OpenAI API key" },
@@ -366,7 +370,11 @@ public partial class MainWindow
             Tr("FloatingPauseTooltip"),
             Tr("FloatingPlayTooltip"),
             Tr("FloatingLiveOffTooltip"),
-            Tr("FloatingLiveOnTooltip"));
+            Tr("FloatingLiveOnTooltip"),
+            Tr("FloatingPreviousAnswerTooltip"),
+            Tr("FloatingNextAnswerTooltip"),
+            Tr("FloatingPreviousLiveTooltip"),
+            Tr("FloatingNextLiveTooltip"));
     }
 
     private string Tr(string key)

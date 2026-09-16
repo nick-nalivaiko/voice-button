@@ -19,7 +19,7 @@ public sealed class CodexLiveNarrationMonitor(
     DiagnosticsLogService diagnosticsLog) : IDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(850);
-    private static readonly TimeSpan SessionDisappearDelay = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan SessionDisappearDelay = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan ParagraphStabilityDelay = TimeSpan.FromSeconds(2);
     private const double AssistantColumnLeftTolerance = 48;
     private const double AssistantColumnAnchorWidth = 96;

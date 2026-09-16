@@ -15,11 +15,12 @@ public partial class FloatingButtonWindow : Window
     private const double IdleCompactWidth = 92;
     private const double ResumeCompactWidth = 136;
     private const double ResumeZoneWidth = 48;
-    private const double PlayerWidth = 274;
+    private const double PlayerWidth = 334;
     private const double LiveTabOverhang = 9;
     private const double EdgePadding = 18;
     private const double ControlZoneWidth = 43;
     private const double DividerWidth = 1;
+    private const double NavigationZoneWidth = 30;
     private const double SeekZoneWidth = 186;
     private const double PlayedWaveformWidth = 135;
     private static readonly TimeSpan ZOrderRefreshInterval = TimeSpan.FromMilliseconds(400);
@@ -46,6 +47,8 @@ public partial class FloatingButtonWindow : Window
     private readonly Action _resumePlayback;
     private readonly Action _speakLatest;
     private readonly Action _speakClipboard;
+    private readonly Action _navigatePrevious;
+    private readonly Action _navigateNext;
     private readonly Action _togglePause;
     private readonly Action<double> _seek;
     private readonly Action _stop;
@@ -63,6 +66,9 @@ public partial class FloatingButtonWindow : Window
     private bool _canResumePlayback;
     private bool _liveNarrationAvailable;
     private bool _liveNarrationActive;
+    private bool _canNavigatePrevious;
+    private bool _canNavigateNext;
+    private bool _navigationUsesLiveHistory;
     private string _compactIdleTooltip = "Микрофон / новый ответ; ПКМ по динамику: озвучить clipboard";
     private string _compactResumeTooltip = "Микрофон / продолжить аудио / новый ответ; ПКМ по динамику: clipboard";
     private string _recordingTooltip = "Остановить запись и вставить текст";
@@ -71,6 +77,10 @@ public partial class FloatingButtonWindow : Window
     private string _playingPlaybackTooltip = "Пауза / перемотка / стоп";
     private string _liveNarrationOffTooltip = "Включить озвучку хода работы Codex";
     private string _liveNarrationOnTooltip = "Выключить озвучку хода работы Codex";
+    private string _previousAnswerTooltip = "Предыдущий ответ";
+    private string _nextAnswerTooltip = "Следующий ответ";
+    private string _previousLiveTooltip = "Предыдущий промежуточный диалог";
+    private string _nextLiveTooltip = "Следующий промежуточный диалог";
     private double _compactRight;
     private double _compactTop;
     private IntPtr _windowHandle;
@@ -81,6 +91,8 @@ public partial class FloatingButtonWindow : Window
         Action resumePlayback,
         Action speakLatest,
         Action speakClipboard,
+        Action navigatePrevious,
+        Action navigateNext,
         Action togglePause,
         Action<double> seek,
         Action stop,
@@ -94,6 +106,8 @@ public partial class FloatingButtonWindow : Window
         _resumePlayback = resumePlayback;
         _speakLatest = speakLatest;
         _speakClipboard = speakClipboard;
+        _navigatePrevious = navigatePrevious;
+        _navigateNext = navigateNext;
         _togglePause = togglePause;
         _seek = seek;
         _stop = stop;
@@ -400,7 +414,8 @@ public partial class FloatingButtonWindow : Window
             {
                 _stop();
             }
-            else
+            else if (clickPoint.X >= PlayerSeekStart
+                && clickPoint.X <= PlayerSeekStart + SeekZoneWidth)
             {
                 _isSeeking = true;
                 ButtonShell.CaptureMouse();
@@ -483,6 +498,25 @@ public partial class FloatingButtonWindow : Window
             _toggleLiveNarration();
         }
     }
+
+    private void PreviousNavigationButton_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (_canNavigatePrevious)
+        {
+            _navigatePrevious();
+        }
+    }
+
+    private void NextNavigationButton_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (_canNavigateNext)
+        {
+            _navigateNext();
+        }
+    }
+
     private void ButtonShell_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_isSeeking)
@@ -568,6 +602,23 @@ public partial class FloatingButtonWindow : Window
         }
     }
 
+    public void SetNavigationState(bool canPrevious, bool canNext, bool useLiveHistory)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => SetNavigationState(canPrevious, canNext, useLiveHistory));
+            return;
+        }
+
+        _canNavigatePrevious = canPrevious;
+        _canNavigateNext = canNext;
+        _navigationUsesLiveHistory = useLiveHistory;
+        if (IsLoaded)
+        {
+            ApplyPlaybackVisual();
+        }
+    }
+
     public void SetLocalizedTooltips(
         string compactIdle,
         string compactResume,
@@ -576,7 +627,11 @@ public partial class FloatingButtonWindow : Window
         string pausedPlayback,
         string playingPlayback,
         string liveNarrationOff,
-        string liveNarrationOn)
+        string liveNarrationOn,
+        string previousAnswer,
+        string nextAnswer,
+        string previousLive,
+        string nextLive)
     {
         _compactIdleTooltip = compactIdle;
         _compactResumeTooltip = compactResume;
@@ -586,6 +641,10 @@ public partial class FloatingButtonWindow : Window
         _playingPlaybackTooltip = playingPlayback;
         _liveNarrationOffTooltip = liveNarrationOff;
         _liveNarrationOnTooltip = liveNarrationOn;
+        _previousAnswerTooltip = previousAnswer;
+        _nextAnswerTooltip = nextAnswer;
+        _previousLiveTooltip = previousLive;
+        _nextLiveTooltip = nextLive;
         if (IsLoaded)
         {
             ApplyPlaybackVisual();
@@ -633,6 +692,28 @@ public partial class FloatingButtonWindow : Window
         LiveNarrationGlow.Opacity = _liveNarrationActive ? 0.82 : 0.5;
         LiveNarrationDot.Fill = BrushFromHex(_liveNarrationActive ? "#FFF1F1" : "#071528");
         LiveNarrationButton.ToolTip = _liveNarrationActive ? _liveNarrationOnTooltip : _liveNarrationOffTooltip;
+        PreviousNavigationButton.Opacity = _canNavigatePrevious ? 1 : 0.28;
+        PreviousNavigationButton.IsHitTestVisible = _canNavigatePrevious;
+        PreviousNavigationButton.Cursor = _canNavigatePrevious
+            ? System.Windows.Input.Cursors.Hand
+            : System.Windows.Input.Cursors.Arrow;
+        NextNavigationButton.Opacity = _canNavigateNext ? 1 : 0.28;
+        NextNavigationButton.IsHitTestVisible = _canNavigateNext;
+        NextNavigationButton.Cursor = _canNavigateNext
+            ? System.Windows.Input.Cursors.Hand
+            : System.Windows.Input.Cursors.Arrow;
+        PreviousNavigationButton.ToolTip = _navigationUsesLiveHistory
+            ? _previousLiveTooltip
+            : _previousAnswerTooltip;
+        NextNavigationButton.ToolTip = _navigationUsesLiveHistory
+            ? _nextLiveTooltip
+            : _nextAnswerTooltip;
+        System.Windows.Automation.AutomationProperties.SetName(
+            PreviousNavigationButton,
+            PreviousNavigationButton.ToolTip?.ToString() ?? string.Empty);
+        System.Windows.Automation.AutomationProperties.SetName(
+            NextNavigationButton,
+            NextNavigationButton.ToolTip?.ToString() ?? string.Empty);
         System.Windows.Automation.AutomationProperties.SetName(
             LiveNarrationButton,
             LiveNarrationButton.ToolTip?.ToString() ?? string.Empty);
@@ -691,10 +772,11 @@ public partial class FloatingButtonWindow : Window
 
     private static double PlayerWindowWidth => PlayerWidth + LiveTabOverhang;
 
+    private static double PlayerSeekStart => ControlZoneWidth + DividerWidth + NavigationZoneWidth;
+
     private void SeekFromPoint(double x)
     {
-        var seekStart = ControlZoneWidth + DividerWidth;
-        var progress = (x - seekStart) / SeekZoneWidth;
+        var progress = (x - PlayerSeekStart) / SeekZoneWidth;
         _seek(Math.Clamp(progress, 0, 1));
     }
 

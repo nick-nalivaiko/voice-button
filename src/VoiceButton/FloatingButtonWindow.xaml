@@ -142,7 +142,9 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="43" />
                     <ColumnDefinition Width="1" />
+                    <ColumnDefinition Width="30" />
                     <ColumnDefinition Width="186" />
+                    <ColumnDefinition Width="30" />
                     <ColumnDefinition Width="1" />
                     <ColumnDefinition Width="43" />
                 </Grid.ColumnDefinitions>
@@ -168,7 +170,27 @@
 
                 <Border Grid.Column="1" Width="1" Background="#2B8DFF" Opacity="0.42" />
 
-                <Border Grid.Column="2" Background="#071528">
+                <Border x:Name="PreviousNavigationButton"
+                        Grid.Column="2"
+                        Background="#071528"
+                        Cursor="Hand"
+                        ToolTip="Предыдущий ответ"
+                        AutomationProperties.Name="Предыдущий ответ"
+                        MouseLeftButtonDown="PreviousNavigationButton_MouseLeftButtonDown">
+                    <Path Data="M 10 4 L 5 9 L 10 14"
+                          Stroke="#37D0F4"
+                          StrokeThickness="2"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          Width="7"
+                          Height="12"
+                          Stretch="Uniform"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center" />
+                </Border>
+
+                <Border Grid.Column="3" Background="#071528">
                     <Grid Margin="8,0,6,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="141" />
@@ -253,9 +275,29 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="3" Width="1" Background="#2B8DFF" Opacity="0.42" />
+                <Border x:Name="NextNavigationButton"
+                        Grid.Column="4"
+                        Background="#071528"
+                        Cursor="Hand"
+                        ToolTip="Следующий ответ"
+                        AutomationProperties.Name="Следующий ответ"
+                        MouseLeftButtonDown="NextNavigationButton_MouseLeftButtonDown">
+                    <Path Data="M 5 4 L 10 9 L 5 14"
+                          Stroke="#37D0F4"
+                          StrokeThickness="2"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          Width="7"
+                          Height="12"
+                          Stretch="Uniform"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center" />
+                </Border>
 
-                <Border Grid.Column="4" CornerRadius="0,18,18,0" Background="#0A1B30">
+                <Border Grid.Column="5" Width="1" Background="#2B8DFF" Opacity="0.42" />
+
+                <Border Grid.Column="6" CornerRadius="0,18,18,0" Background="#0A1B30">
                     <Grid Width="31" Height="31" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Ellipse Fill="#0B3764" Stroke="#1E96FF" StrokeThickness="1.2" Opacity="0.9" />
                         <Border Width="11"

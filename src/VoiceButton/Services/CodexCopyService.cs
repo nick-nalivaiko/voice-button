@@ -11,6 +11,16 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
 
     public async Task<string> CopyLastAnswerAsync(Action<string, string?> report, CancellationToken cancellationToken)
     {
+        var answer = await CopyAnswerAsync(0, report, cancellationToken);
+        return answer.Text;
+    }
+
+    public async Task<CopiedAssistantAnswer> CopyAnswerAsync(
+        int offsetFromLatest,
+        Action<string, string?> report,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offsetFromLatest);
         report("Ищу приложение", "Выбираю активное окно Codex или ChatGPT.");
         var window = windowFinder.FindBestWindow()
             ?? throw new InvalidOperationException("Не найдено окно Codex или ChatGPT. Открой нужное приложение и попробуй снова.");
@@ -30,18 +40,29 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
         try
         {
             report($"Копирую из {window.AppName}", string.IsNullOrWhiteSpace(window.Title) ? window.ProcessName : window.Title);
-            var search = await FindLatestAnswerCopyButtonAsync(window.Element, settings.HoverToRevealCopyButton, report, cancellationToken);
+            var search = await FindAnswerCopyButtonAsync(
+                window.Element,
+                offsetFromLatest,
+                settings.HoverToRevealCopyButton,
+                report,
+                cancellationToken);
             var copyButton = search.Button;
             if (copyButton is null)
             {
-                if (settings.FallbackToClipboardWhenCopyMissing)
+                if (offsetFromLatest == 0 && settings.FallbackToClipboardWhenCopyMissing)
                 {
                     var fallbackText = clipboardService.GetText();
                     if (!string.IsNullOrWhiteSpace(fallbackText))
                     {
                         report("Clipboard", $"Copy у ответа {window.AppName} не найден, озвучиваю текущий clipboard.");
-                        return fallbackText.Trim();
+                        return new CopiedAssistantAnswer(fallbackText.Trim(), 0, 1);
                     }
+                }
+
+                if (search.AnswerCandidateCount > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"В окне доступно ответов: {search.AnswerCandidateCount}. Выбранный ответ уже вне истории.");
                 }
 
                 throw new InvalidOperationException($"Не нашел кнопку Copy / Копировать у ответа {window.AppName}. Нажми ее вручную и используй кнопку Озвучить clipboard.");
@@ -55,7 +76,7 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
                 throw new InvalidOperationException($"{window.AppName} скопировал пустой текст.");
             }
 
-            return text.Trim();
+            return new CopiedAssistantAnswer(text.Trim(), offsetFromLatest, search.AnswerCandidateCount);
         }
         finally
         {
@@ -92,13 +113,14 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
             hoverUsed);
     }
 
-    private static async Task<CopyButtonSearchSnapshot> FindLatestAnswerCopyButtonAsync(
+    private static async Task<CopyButtonSearchSnapshot> FindAnswerCopyButtonAsync(
         AutomationElement root,
+        int offsetFromLatest,
         bool allowHover,
         Action<string, string?> report,
         CancellationToken cancellationToken)
     {
-        var snapshot = FindLatestAnswerCopyButton(root);
+        var snapshot = FindLatestAnswerCopyButton(root, offsetFromLatest);
         if (snapshot.Button is not null || !allowHover)
         {
             return snapshot;
@@ -106,10 +128,10 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
 
         report("Ищу Copy ответа", "Игнорирую Copy у твоего промпта и ищу последний готовый ответ.");
         await HoverNearLatestMessagesAsync(root, cancellationToken);
-        return FindLatestAnswerCopyButton(root);
+        return FindLatestAnswerCopyButton(root, offsetFromLatest);
     }
 
-    private static CopyButtonSearchSnapshot FindLatestAnswerCopyButton(AutomationElement root)
+    private static CopyButtonSearchSnapshot FindLatestAnswerCopyButton(AutomationElement root, int offsetFromLatest = 0)
     {
         var allCandidates = FindCopyButtonCandidates(root);
         if (allCandidates.Count == 0)
@@ -134,7 +156,7 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
                 .ToList();
 
         return new CopyButtonSearchSnapshot(
-            answerCandidates.FirstOrDefault()?.Element,
+            answerCandidates.ElementAtOrDefault(offsetFromLatest)?.Element,
             allCandidates.Count,
             answerCandidates.Count);
     }
@@ -372,6 +394,8 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
         int AllCandidateCount,
         int AnswerCandidateCount);
 }
+
+public sealed record CopiedAssistantAnswer(string Text, int OffsetFromLatest, int AnswerCount);
 
 public sealed record CodexCopyDiagnostics(
     bool WindowFound,

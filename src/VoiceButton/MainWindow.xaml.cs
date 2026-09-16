@@ -23,6 +23,8 @@ public partial class MainWindow : Window
     private const string ToggleLiveNarrationHotkeyId = "ToggleLiveNarration";
     private const int SpeechChunkMaxAttempts = 3;
     private static readonly TimeSpan SpeechStreamStartTimeout = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan LiveNarrationDuplicateWindow = TimeSpan.FromMinutes(2);
+    private const int MaxRecentLiveNarrationParagraphs = 512;
     private const string LiveNarrationInstructions =
         "Произнеси только переданный текст полностью, от первого до последнего слова, спокойно и естественно, сохраняя язык текста. " +
         "Не добавляй вступления, названия говорящего, фразы вроде «ChatGPT говорит», комментарии или заключения.";
@@ -45,6 +47,8 @@ public partial class MainWindow : Window
     private readonly DiagnosticsLogService _diagnosticsLog = new();
     private readonly Queue<LiveNarrationQueueItem> _liveNarrationQueue = [];
     private readonly HashSet<string> _handledLiveNarrationParagraphs = new(StringComparer.Ordinal);
+    private readonly Dictionary<LiveNarrationParagraphSignature, DateTime> _recentLiveNarrationParagraphs = [];
+    private readonly List<LiveNarrationQueueItem> _liveNarrationHistory = [];
 
     private CancellationTokenSource? _currentRun;
     private CancellationTokenSource? _latestCaptureRun;
@@ -71,6 +75,11 @@ public partial class MainWindow : Window
     private string? _handledLiveNarrationSessionId;
     private bool _liveNarrationActive;
     private bool _liveNarrationPumpRunning;
+    private string? _liveNarrationHistorySessionId;
+    private int _liveNarrationHistoryPosition = -1;
+    private int _completedAnswerOffsetFromLatest;
+    private int _completedAnswerCount;
+    private bool _isNavigatingSpeech;
 
     public MainWindow()
     {
@@ -1185,10 +1194,13 @@ public partial class MainWindow : Window
             _handledLiveNarrationParagraphs.Clear();
         }
 
+        UpdateLiveNarrationHistory(snapshot);
         if (_liveNarrationActive)
         {
             QueueLiveNarrationSnapshot(snapshot);
         }
+
+        UpdateFloatingNavigationState();
     }
 
     private void ToggleLiveNarration()
@@ -1209,12 +1221,18 @@ public partial class MainWindow : Window
         {
             EnsureApiKeyReady();
             _liveNarrationActive = true;
+            if (_liveNarrationHistoryPosition < 0 && _liveNarrationHistory.Count > 0)
+            {
+                _liveNarrationHistoryPosition = _liveNarrationHistory.Count - 1;
+            }
+
             if (_currentRunIsLiveNarration)
             {
                 _audioPlaybackService.SetPaused(false);
             }
 
             _floatingButtonWindow?.SetLiveNarrationState(available: true, active: true);
+            UpdateFloatingNavigationState();
             QueueLiveNarrationSnapshot(_liveNarrationSnapshot);
             SetStatus(Tr("LiveNarrationOn"), Tr("LiveNarrationOnDetail"), "#41D6A1", busy: false);
         }
@@ -1233,6 +1251,7 @@ public partial class MainWindow : Window
         }
 
         _floatingButtonWindow?.SetLiveNarrationState(available: true, active: false);
+        UpdateFloatingNavigationState();
         SetStatus(Tr("LiveNarrationPaused"), Tr("LiveNarrationPausedDetail"), "#F9C74F", busy: false);
     }
 
@@ -1250,6 +1269,62 @@ public partial class MainWindow : Window
         _floatingButtonWindow?.SetLiveNarrationState(
             _appSettings.EnableCodexLiveNarration,
             active: false);
+        UpdateFloatingNavigationState();
+    }
+
+    private void UpdateLiveNarrationHistory(LiveNarrationSnapshot snapshot)
+    {
+        if (string.IsNullOrWhiteSpace(snapshot.SessionId))
+        {
+            return;
+        }
+
+        if (snapshot.Paragraphs.Count == 0
+            && !string.Equals(snapshot.SessionId, _liveNarrationHistorySessionId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        LiveNarrationQueueItem? previousItem = null;
+        if (!string.Equals(snapshot.SessionId, _liveNarrationHistorySessionId, StringComparison.Ordinal))
+        {
+            if (_liveNarrationHistoryPosition >= 0
+                && _liveNarrationHistoryPosition < _liveNarrationHistory.Count)
+            {
+                previousItem = _liveNarrationHistory[_liveNarrationHistoryPosition];
+            }
+
+            _liveNarrationHistorySessionId = snapshot.SessionId;
+            _liveNarrationHistory.Clear();
+            _liveNarrationHistoryPosition = -1;
+        }
+
+        foreach (var paragraph in snapshot.Paragraphs)
+        {
+            var existingPosition = _liveNarrationHistory.FindIndex(item => item.Index == paragraph.Index);
+            var item = new LiveNarrationQueueItem(snapshot.SessionId, paragraph.Index, paragraph.Text);
+            if (existingPosition >= 0)
+            {
+                _liveNarrationHistory[existingPosition] = item;
+            }
+            else
+            {
+                _liveNarrationHistory.Add(item);
+            }
+        }
+
+        _liveNarrationHistory.Sort((left, right) => left.Index.CompareTo(right.Index));
+        if (previousItem is not null)
+        {
+            _liveNarrationHistoryPosition = _liveNarrationHistory.FindIndex(item =>
+                item.Index == previousItem.Index
+                && string.Equals(item.Text, previousItem.Text, StringComparison.Ordinal));
+        }
+
+        if (_liveNarrationActive && _liveNarrationHistoryPosition < 0 && _liveNarrationHistory.Count > 0)
+        {
+            _liveNarrationHistoryPosition = _liveNarrationHistory.Count - 1;
+        }
     }
 
     private void QueueLiveNarrationSnapshot(LiveNarrationSnapshot snapshot)
@@ -1259,19 +1334,61 @@ public partial class MainWindow : Window
             return;
         }
 
+        PruneRecentLiveNarrationParagraphs();
+        var now = DateTime.UtcNow;
         foreach (var paragraph in snapshot.Paragraphs)
         {
             var key = $"{snapshot.SessionId}:{paragraph.Index}";
-            if (_handledLiveNarrationParagraphs.Add(key))
+            var signature = new LiveNarrationParagraphSignature(paragraph.Text);
+            var wasRecentlyQueued = _recentLiveNarrationParagraphs.TryGetValue(signature, out var queuedAt)
+                && now - queuedAt < LiveNarrationDuplicateWindow;
+            if (!_handledLiveNarrationParagraphs.Add(key))
             {
-                _liveNarrationQueue.Enqueue(new LiveNarrationQueueItem(
-                    snapshot.SessionId,
-                    paragraph.Index,
-                    paragraph.Text));
+                continue;
             }
+
+            if (wasRecentlyQueued)
+            {
+                _diagnosticsLog.Info(
+                    "Codex live narration speech",
+                    $"session={snapshot.SessionId}, paragraph={paragraph.Index}, chars={paragraph.Text.Length}, state=duplicate-suppressed");
+                continue;
+            }
+
+            _recentLiveNarrationParagraphs[signature] = now;
+            _liveNarrationQueue.Enqueue(new LiveNarrationQueueItem(
+                snapshot.SessionId,
+                paragraph.Index,
+                paragraph.Text));
         }
 
         StartLiveNarrationPump();
+    }
+
+    private void PruneRecentLiveNarrationParagraphs()
+    {
+        var cutoff = DateTime.UtcNow - LiveNarrationDuplicateWindow;
+        foreach (var signature in _recentLiveNarrationParagraphs
+                     .Where(pair => pair.Value < cutoff)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            _recentLiveNarrationParagraphs.Remove(signature);
+        }
+
+        if (_recentLiveNarrationParagraphs.Count <= MaxRecentLiveNarrationParagraphs)
+        {
+            return;
+        }
+
+        foreach (var signature in _recentLiveNarrationParagraphs
+                     .OrderBy(pair => pair.Value)
+                     .Take(_recentLiveNarrationParagraphs.Count - MaxRecentLiveNarrationParagraphs)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            _recentLiveNarrationParagraphs.Remove(signature);
+        }
     }
 
     private void StartLiveNarrationPump()
@@ -1311,6 +1428,11 @@ public partial class MainWindow : Window
 
                 try
                 {
+                    _liveNarrationHistoryPosition = _liveNarrationHistory.FindIndex(item =>
+                        string.Equals(item.SessionId, paragraph.SessionId, StringComparison.Ordinal)
+                        && item.Index == paragraph.Index
+                        && string.Equals(item.Text, paragraph.Text, StringComparison.Ordinal));
+                    UpdateFloatingNavigationState();
                     SetStatus(Tr("LiveNarrationSpeaking"), Tr("LiveNarrationParagraphDetail"), "#41D6A1", busy: true);
                     _diagnosticsLog.Info(
                         "Codex live narration speech",
@@ -1368,6 +1490,170 @@ public partial class MainWindow : Window
         _playbackStopped = false;
         _floatingButtonWindow?.SetResumeAvailable(false);
         SetStatus(Tr("LiveNarrationWaiting"), Tr("LiveNarrationStoppedDetail"), "#F9C74F", busy: false);
+    }
+
+    private void NavigatePreviousSpeech()
+    {
+        _ = NavigateSpeechHistoryAsync(-1);
+    }
+
+    private void NavigateNextSpeech()
+    {
+        _ = NavigateSpeechHistoryAsync(1);
+    }
+
+    private async Task NavigateSpeechHistoryAsync(int direction)
+    {
+        if (_isNavigatingSpeech || direction is not (-1 or 1))
+        {
+            return;
+        }
+
+        _isNavigatingSpeech = true;
+        try
+        {
+            if (_liveNarrationActive)
+            {
+                await NavigateLiveNarrationHistoryAsync(direction);
+            }
+            else
+            {
+                await NavigateCompletedAnswerHistoryAsync(direction);
+            }
+        }
+        finally
+        {
+            _isNavigatingSpeech = false;
+            UpdateFloatingNavigationState();
+        }
+    }
+
+    private async Task NavigateLiveNarrationHistoryAsync(int direction)
+    {
+        var targetPosition = _liveNarrationHistoryPosition + direction;
+        if (targetPosition < 0 || targetPosition >= _liveNarrationHistory.Count)
+        {
+            return;
+        }
+
+        if (_currentRun is not null && !_currentRunIsSpeech)
+        {
+            return;
+        }
+
+        _liveNarrationQueue.Clear();
+        await CancelCurrentSpeechRunAndWaitAsync();
+        var item = _liveNarrationHistory[targetPosition];
+        _liveNarrationHistoryPosition = targetPosition;
+        UpdateFloatingNavigationState();
+        _ = SpeakLiveNarrationHistoryItemAsync(item);
+    }
+
+    private async Task SpeakLiveNarrationHistoryItemAsync(LiveNarrationQueueItem item)
+    {
+        if (!TryStartRun(out var cancellationToken, isSpeech: true, isLiveNarration: true))
+        {
+            return;
+        }
+
+        try
+        {
+            SetStatus(Tr("LiveNarrationSpeaking"), Tr("LiveNarrationParagraphDetail"), "#41D6A1", busy: true);
+            _diagnosticsLog.Info(
+                "Codex live narration navigation",
+                $"session={item.SessionId}, paragraph={item.Index}, chars={item.Text.Length}, state=started");
+            await SpeakTextAsync(
+                item.Text,
+                cancellationToken,
+                keepAsSingleChunk: true,
+                instructionsOverride: LiveNarrationInstructions);
+            _diagnosticsLog.Info(
+                "Codex live narration navigation",
+                $"session={item.SessionId}, paragraph={item.Index}, chars={item.Text.Length}, state=completed");
+        }
+        catch (OperationCanceledException)
+        {
+            if (_liveNarrationActive)
+            {
+                SetStatus(Tr("LiveNarrationWaiting"), Tr("LiveNarrationWaitingDetail"), "#F9C74F", busy: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _diagnosticsLog.Error("Codex live narration navigation", ex);
+            SetStatus(Tr("Error"), ex.Message, "#F25F5C", busy: false);
+        }
+        finally
+        {
+            FinishRun();
+        }
+    }
+
+    private async Task NavigateCompletedAnswerHistoryAsync(int direction)
+    {
+        var targetOffset = _completedAnswerOffsetFromLatest - direction;
+        if (targetOffset < 0 || targetOffset >= _completedAnswerCount)
+        {
+            return;
+        }
+
+        if (_currentRun is not null && !_currentRunIsSpeech)
+        {
+            return;
+        }
+
+        await CancelCurrentSpeechRunAndWaitAsync();
+        using var captureRun = new CancellationTokenSource();
+        _latestCaptureRun = captureRun;
+        SetBusy(true);
+
+        try
+        {
+            var answer = await _codexCopyService.CopyAnswerAsync(targetOffset, SetCopyStatus, captureRun.Token);
+            _completedAnswerOffsetFromLatest = answer.OffsetFromLatest;
+            _completedAnswerCount = answer.AnswerCount;
+            UpdateFloatingNavigationState();
+            _diagnosticsLog.Info(
+                "Answer history navigation",
+                $"offset={answer.OffsetFromLatest}, answers={answer.AnswerCount}, chars={answer.Text.Length}");
+            _ = SpeakCapturedAnswerAsync(answer.Text);
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Остановлено", "Переход к соседнему ответу отменен.", "#F9C74F", busy: false);
+        }
+        catch (Exception ex)
+        {
+            _diagnosticsLog.Error("Answer history navigation", ex);
+            SetStatus("Ошибка", ex.Message, "#F25F5C", busy: false);
+        }
+        finally
+        {
+            if (ReferenceEquals(_latestCaptureRun, captureRun))
+            {
+                _latestCaptureRun = null;
+            }
+
+            if (_currentRun is null)
+            {
+                SetBusy(false);
+            }
+        }
+    }
+
+    private void UpdateFloatingNavigationState()
+    {
+        var useLiveHistory = _liveNarrationActive;
+        var canPrevious = useLiveHistory
+            ? _liveNarrationHistoryPosition > 0
+            : _completedAnswerCount > 0
+                && _completedAnswerOffsetFromLatest + 1 < _completedAnswerCount;
+        var canNext = useLiveHistory
+            ? _liveNarrationHistoryPosition >= 0
+                && _liveNarrationHistoryPosition + 1 < _liveNarrationHistory.Count
+            : _completedAnswerOffsetFromLatest > 0;
+
+        _floatingButtonWindow?.SetNavigationState(canPrevious, canNext, useLiveHistory);
     }
 
     private void ResumeSavedPlayback()
@@ -1605,10 +1891,10 @@ public partial class MainWindow : Window
             _latestCaptureRun = captureRun;
             SetBusy(true);
 
-            string text;
+            CopiedAssistantAnswer answer;
             try
             {
-                text = await _codexCopyService.CopyLastAnswerAsync(SetCopyStatus, captureRun.Token);
+                answer = await _codexCopyService.CopyAnswerAsync(0, SetCopyStatus, captureRun.Token);
             }
             finally
             {
@@ -1618,11 +1904,16 @@ public partial class MainWindow : Window
                 }
             }
 
-            _diagnosticsLog.Info("Latest answer capture", $"chars={text.Length}");
+            _completedAnswerOffsetFromLatest = answer.OffsetFromLatest;
+            _completedAnswerCount = answer.AnswerCount;
+            UpdateFloatingNavigationState();
+            _diagnosticsLog.Info(
+                "Latest answer capture",
+                $"chars={answer.Text.Length}, answers={answer.AnswerCount}");
             await CancelCurrentSpeechRunAndWaitAsync();
             _playbackStopped = false;
             _floatingButtonWindow?.SetResumeAvailable(false);
-            _ = SpeakCapturedAnswerAsync(text);
+            _ = SpeakCapturedAnswerAsync(answer.Text);
         }
         catch (OperationCanceledException)
         {
@@ -2321,6 +2612,8 @@ public partial class MainWindow : Window
             ResumeSavedPlayback,
             () => _ = SpeakLatestAnswerAsync(),
             () => _ = SpeakClipboardFromFloatingAsync(),
+            NavigatePreviousSpeech,
+            NavigateNextSpeech,
             _audioPlaybackService.TogglePause,
             _audioPlaybackService.Seek,
             StopCurrentRun,
@@ -2334,6 +2627,7 @@ public partial class MainWindow : Window
         _floatingButtonWindow.SetLiveNarrationState(
             _appSettings.EnableCodexLiveNarration,
             _liveNarrationActive);
+        UpdateFloatingNavigationState();
         ApplyFloatingButtonLocalization();
         _floatingButtonWindow.Show();
     }
@@ -2412,4 +2706,6 @@ public partial class MainWindow : Window
     private sealed record LocalizedOption(string Id, string Label);
 
     private sealed record LiveNarrationQueueItem(string SessionId, int Index, string Text);
+
+    private readonly record struct LiveNarrationParagraphSignature(string Text);
 }

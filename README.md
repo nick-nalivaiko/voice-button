@@ -15,7 +15,7 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **OpenAI text-to-speech**: model, voice, and playback speed are configurable.
 - **Buffered streaming playback**: warms up for at least two seconds, starts once ten seconds are buffered (or a shorter clip is complete), and protects a four-second reserve during network slowdowns.
 - **Floating controls**: microphone on the left, latest-answer speech on the right, right-click speaker playback for the clipboard, and an expanding player during playback.
-- **Real playback controls**: pause/resume, waveform seeking, elapsed time, and stop.
+- **Real playback controls**: pause/resume, waveform seeking, elapsed time, previous/next navigation, and stop.
 - **Live Codex narration**: an optional attached corner control follows complete visible Codex work paragraphs, skips service activity labels, and plays each paragraph through the same seekable player.
 - **Universal dictation**: records speech, transcribes it with OpenAI, and inserts it into the focused input field or leaves it in the clipboard.
 - **Global hotkeys**: five configurable shortcuts cover the latest answer, clipboard speech, context-aware microphone action, sending recorded assistant input with Enter, and pausing or resuming live narration.
@@ -29,17 +29,18 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 
 ## Floating controls
 
-The compact control stays out of the way until playback starts. Left-click the speaker for the latest answer, or right-click it to speak the current clipboard text. During speech it expands into a 274 px player with a 27-segment seekable waveform. Stop collapses the player and reveals a middle waveform button for resumable audio; completed playback returns the control to its two-button state.
+The compact control stays out of the way until playback starts. Left-click the speaker for the latest answer, or right-click it to speak the current clipboard text. During speech it expands into a 334 px player while preserving the full 27-segment seekable waveform. Stop collapses the player and reveals a middle waveform button for resumable audio; completed playback returns the control to its two-button state.
 
 | Compact control | Playback control |
 | --- | --- |
-| <img src="docs/screenshots/floating-button.png" alt="Compact Voice Button control" width="184"> | <img src="docs/screenshots/floating-player.png" alt="Expanded Voice Button player" width="548"> |
+| <img src="docs/screenshots/floating-button.png" alt="Compact Voice Button control" width="184"> | <img src="docs/screenshots/floating-player.png" alt="Expanded Voice Button player" width="668"> |
 
 - **Compact left**: use the built-in microphone in Codex or ChatGPT; start Voice Button dictation in other applications.
 - **Compact right**: left-click to speak the latest answer; right-click to speak clipboard text.
 - **Saved audio**: the middle waveform appears only when stopped audio can be resumed.
-- **Expanded player**: pause or resume on the left, seek through the waveform, and stop on the right.
-- **Live corner control**: enable it to queue visible Codex work paragraphs. Pause and seek operate on the current paragraph; stop skips the current live queue and waits for the next paragraph.
+- **Expanded player**: pause or resume on the left, seek through the waveform, move backward or forward through available items, and stop on the right.
+- **Context-aware navigation**: with live narration off, the arrows select adjacent completed assistant answers; with live narration on, they move through the current session's intermediate paragraphs.
+- **Live corner control**: enable it to queue visible Codex work paragraphs exactly once. Pause and seek operate on the current paragraph; stop skips the current live queue and waits for the next paragraph.
 
 ## Interface
 

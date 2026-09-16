@@ -2606,19 +2606,49 @@ public partial class MainWindow : Window
         }
 
         WindowState = WindowState.Normal;
+        ForceMainWindowToForeground();
+    }
+
+    private void ForceMainWindowToForeground()
+    {
         var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         if (handle != IntPtr.Zero)
         {
             _ = NativeMethods.ShowWindow(handle, NativeMethods.SwRestore);
+            var flags = NativeMethods.SwpNoMove
+                | NativeMethods.SwpNoSize
+                | NativeMethods.SwpNoActivate
+                | NativeMethods.SwpNoOwnerZOrder;
+            _ = NativeMethods.SetWindowPos(
+                handle,
+                NativeMethods.HwndTopmost,
+                0,
+                0,
+                0,
+                0,
+                flags);
+            _ = NativeMethods.SetWindowPos(
+                handle,
+                NativeMethods.HwndNotTopmost,
+                0,
+                0,
+                0,
+                0,
+                flags);
             _ = NativeMethods.SetForegroundWindow(handle);
         }
 
         Activate();
         Focus();
+
+        _diagnosticsLog.Info(
+            "Main window activation",
+            $"handle={handle}, visible={handle != IntPtr.Zero && NativeMethods.IsWindowVisible(handle)}, state={WindowState}");
     }
 
     internal void ShowFromExternalLaunch()
     {
+        _diagnosticsLog.Info("Single-instance activation", "external launch requested");
         ShowFromTray();
     }
 

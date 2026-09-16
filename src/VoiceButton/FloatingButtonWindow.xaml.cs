@@ -60,6 +60,7 @@ public partial class FloatingButtonWindow : Window
 
     private PlaybackSnapshot _playbackSnapshot = PlaybackSnapshot.Inactive;
     private bool _isPlaybackActive;
+    private bool _playbackPending;
     private bool _isSeeking;
     private bool _dictationRecording;
     private bool _dictationProcessing;
@@ -602,6 +603,21 @@ public partial class FloatingButtonWindow : Window
         }
     }
 
+    public void SetPlaybackPending(bool pending)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => SetPlaybackPending(pending));
+            return;
+        }
+
+        _playbackPending = pending;
+        if (IsLoaded)
+        {
+            ApplyPlaybackVisual();
+        }
+    }
+
     public void SetNavigationState(bool canPrevious, bool canNext, bool useLiveHistory)
     {
         if (!Dispatcher.CheckAccess())
@@ -653,7 +669,7 @@ public partial class FloatingButtonWindow : Window
 
     private void ApplyPlaybackVisual()
     {
-        var active = _playbackSnapshot.IsActive;
+        var active = _playbackSnapshot.IsActive || _playbackPending;
         if (active != _isPlaybackActive)
         {
             ResizeForPlayback(active);

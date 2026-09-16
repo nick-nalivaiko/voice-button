@@ -1521,6 +1521,16 @@ public partial class MainWindow : Window
                 await NavigateCompletedAnswerHistoryAsync(direction);
             }
         }
+        catch (OperationCanceledException)
+        {
+            _floatingButtonWindow?.SetPlaybackPending(false);
+        }
+        catch (Exception ex)
+        {
+            _floatingButtonWindow?.SetPlaybackPending(false);
+            _diagnosticsLog.Error("Speech history navigation", ex);
+            SetStatus("Ошибка", ex.Message, "#F25F5C", busy: false);
+        }
         finally
         {
             _isNavigatingSpeech = false;
@@ -1542,6 +1552,7 @@ public partial class MainWindow : Window
         }
 
         _liveNarrationQueue.Clear();
+        _floatingButtonWindow?.SetPlaybackPending(true);
         await CancelCurrentSpeechRunAndWaitAsync();
         var item = _liveNarrationHistory[targetPosition];
         _liveNarrationHistoryPosition = targetPosition;
@@ -1553,6 +1564,7 @@ public partial class MainWindow : Window
     {
         if (!TryStartRun(out var cancellationToken, isSpeech: true, isLiveNarration: true))
         {
+            _floatingButtonWindow?.SetPlaybackPending(false);
             return;
         }
 
@@ -1585,6 +1597,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            _floatingButtonWindow?.SetPlaybackPending(false);
             FinishRun();
         }
     }
@@ -1602,6 +1615,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _floatingButtonWindow?.SetPlaybackPending(true);
         await CancelCurrentSpeechRunAndWaitAsync();
         using var captureRun = new CancellationTokenSource();
         _latestCaptureRun = captureRun;
@@ -1620,10 +1634,12 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException)
         {
+            _floatingButtonWindow?.SetPlaybackPending(false);
             SetStatus("Остановлено", "Переход к соседнему ответу отменен.", "#F9C74F", busy: false);
         }
         catch (Exception ex)
         {
+            _floatingButtonWindow?.SetPlaybackPending(false);
             _diagnosticsLog.Error("Answer history navigation", ex);
             SetStatus("Ошибка", ex.Message, "#F25F5C", busy: false);
         }
@@ -1944,6 +1960,7 @@ public partial class MainWindow : Window
     {
         if (!TryStartRun(out var cancellationToken, isSpeech: true))
         {
+            _floatingButtonWindow?.SetPlaybackPending(false);
             return;
         }
 
@@ -1964,6 +1981,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            _floatingButtonWindow?.SetPlaybackPending(false);
             FinishRun();
         }
     }
@@ -2351,6 +2369,8 @@ public partial class MainWindow : Window
 
     private void StopCurrentRun()
     {
+        _floatingButtonWindow?.SetPlaybackPending(false);
+
         if (_dictationRecorderService.IsRecording)
         {
             _ = StopDictationAsync();
@@ -2410,6 +2430,7 @@ public partial class MainWindow : Window
 
     private void CancelCurrentRun()
     {
+        _floatingButtonWindow?.SetPlaybackPending(false);
         _playbackStopped = false;
         _latestCaptureRun?.Cancel();
         _dictationRun?.Cancel();
@@ -2470,6 +2491,7 @@ public partial class MainWindow : Window
         _floatingButtonWindow?.SetPlaybackSnapshot(snapshot);
         if (snapshot.IsActive)
         {
+            _floatingButtonWindow?.SetPlaybackPending(false);
             _floatingButtonWindow?.SetResumeAvailable(false);
         }
     }

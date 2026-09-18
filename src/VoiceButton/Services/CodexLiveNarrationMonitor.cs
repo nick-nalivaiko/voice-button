@@ -823,7 +823,7 @@ public sealed class CodexLiveNarrationMonitor(
     {
         return Regex.IsMatch(
             value,
-            @"^(?:(?:run|ran|running)\s+(?:(?:a|the|\d+)\s+)?commands?|(?:edit|edited|editing|read|reading|view|viewed|open|opened|list|listed|listing)\s+(?:\d+\s+)?files?|(?:search|searched|searching)\s+(?:the\s+)?web|(?:apply|applied|applying)\s+(?:a\s+)?patch|(?:run|ran|running)\s+(?:the\s+)?tests?|(?:use|used|using|call|called|calling)\s+(?:(?:a|the|\d+)\s+)?tools?|(?:view|viewed|viewing|analyze|analyzed|analyzing)\s+(?:(?:an?|the|\d+)\s+)?images?|(?:take|took|taking)\s+(?:(?:a|the|\d+)\s+)?screenshots?)$",
+            @"^(?:(?:run|ran|running)|(?:run|ran|running)\s+(?:(?:a|the|\d+)\s+)?commands?|(?:edit|edited|editing|read|reading|view|viewed|open|opened|list|listed|listing)\s+(?:\d+\s+)?files?|(?:search|searched|searching)\s+(?:the\s+)?web|(?:apply|applied|applying)\s+(?:a\s+)?patch|(?:run|ran|running)\s+(?:the\s+)?tests?|(?:use|used|using|call|called|calling)\s+(?:(?:a|the|\d+)\s+)?tools?|(?:view|viewed|viewing|analyze|analyzed|analyzing)\s+(?:(?:an?|the|\d+)\s+)?images?|(?:take|took|taking)\s+(?:(?:a|the|\d+)\s+)?screenshots?)$",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 

@@ -25,7 +25,7 @@ public static partial class TtsTextSanitizer
             return string.Empty;
         }
 
-        var sanitized = text;
+        var sanitized = ServiceActivityLineRegex().Replace(text, string.Empty);
 
         if (options.HideSecrets)
         {
@@ -386,6 +386,9 @@ public static partial class TtsTextSanitizer
 
     [GeneratedRegex(@"^(?:dotnet|npm|node|python|py|git|rg|curl|pwsh|powershell|docker|kubectl|taskkill|Get-Process|Get-ChildItem|Select-String)\b")]
     private static partial Regex CommonShellCommandRegex();
+
+    [GeneratedRegex(@"(?im)^[ \t]*(?:run|ran|running)(?:\s+(?:(?:a|the|\d+)\s+)?commands?|\s+(?:the\s+)?tests?)?[ \t]*(?:[>›…])?[ \t]*(?:\r?\n|$)")]
+    private static partial Regex ServiceActivityLineRegex();
 
     [GeneratedRegex(@"!\[(?<alt>[^\]]*)\]\([^\)]*\)")]
     private static partial Regex MarkdownImageRegex();

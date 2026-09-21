@@ -769,7 +769,9 @@ public sealed class CodexLiveNarrationMonitor(
         return !LooksLikeActiveMarker(text)
             && !LooksLikeCompletedMarker(text)
             && !IsSpeakerLabel(text)
-            && !IsServiceActivityContainer(text)
+            && !IsNarrationMetadataLabel(text)
+            && !IsServiceActivityText(text)
+            && !LooksLikeAutomaticCompaction(text)
             && !Regex.IsMatch(
                 text,
                 @"^(Awaiting approval|Computer Use|Background processes|Sources|Outputs|View all|Show more)$",
@@ -798,7 +800,15 @@ public sealed class CodexLiveNarrationMonitor(
 
         return Regex.IsMatch(
             text,
-            @"^(?:(?:content|context)\s+(?:was\s+)?automatically\s+compacted|(?:run|ran|running)\s+(?:(?:a|the|\d+)\s+)?commands?)(?:\s|:|$)",
+            @"^(?:(?:content|context)\s+(?:was\s+)?automatically\s+compacted|(?:run|ran|running)(?:\s|:|$))",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool LooksLikeAutomaticCompaction(string value)
+    {
+        return Regex.IsMatch(
+            value,
+            @"^(?:content|context)\s+(?:was\s+)?automatically\s+compacted(?:\s|:|$)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
@@ -807,6 +817,14 @@ public sealed class CodexLiveNarrationMonitor(
         return Regex.IsMatch(
             value.Trim().TrimEnd(':', '-', '—'),
             @"^(?:ChatGPT|Codex|Assistant|Ассистент|Помощник)(?:\s+(?:says|said|говорит|сказал|отвечает|ответил))?$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool IsNarrationMetadataLabel(string value)
+    {
+        return Regex.IsMatch(
+            value.Trim().TrimEnd(':', '-', '—'),
+            @"^(?:answer|final answer|response|analysis|reasoning|commentary|tool|tool call|tool output|system|developer|user|you|ответ|финальный ответ|анализ|рассуждение|система|пользователь|інструмент|відповідь|аналіз|міркування|система|користувач)$",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
@@ -823,7 +841,7 @@ public sealed class CodexLiveNarrationMonitor(
     {
         return Regex.IsMatch(
             value,
-            @"^(?:(?:run|ran|running)|(?:run|ran|running)\s+(?:(?:a|the|\d+)\s+)?commands?|(?:edit|edited|editing|read|reading|view|viewed|open|opened|list|listed|listing)\s+(?:\d+\s+)?files?|(?:search|searched|searching)\s+(?:the\s+)?web|(?:apply|applied|applying)\s+(?:a\s+)?patch|(?:run|ran|running)\s+(?:the\s+)?tests?|(?:use|used|using|call|called|calling)\s+(?:(?:a|the|\d+)\s+)?tools?|(?:view|viewed|viewing|analyze|analyzed|analyzing)\s+(?:(?:an?|the|\d+)\s+)?images?|(?:take|took|taking)\s+(?:(?:a|the|\d+)\s+)?screenshots?)$",
+            @"^(?:(?:run|ran|running)|(?:run|ran|running)\s+(?:(?:a|the|\d+)\s+)?commands?|(?:run|ran|running)\s+[`$&./\\].+|(?:edit|edited|editing|read|reading|view|viewed|open|opened|list|listed|listing)\s+(?:\d+\s+)?files?|(?:search|searched|searching)\s+(?:the\s+)?web|(?:apply|applied|applying)\s+(?:a\s+)?patch|(?:run|ran|running)\s+(?:the\s+)?tests?|(?:use|used|using|call|called|calling)\s+(?:(?:a|the|\d+)\s+)?tools?|(?:view|viewed|viewing|analyze|analyzed|analyzing)\s+(?:(?:an?|the|\d+)\s+)?images?|(?:take|took|taking)\s+(?:(?:a|the|\d+)\s+)?screenshots?)$",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 

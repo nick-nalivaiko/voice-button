@@ -26,6 +26,7 @@ public static partial class TtsTextSanitizer
         }
 
         var sanitized = ServiceActivityLineRegex().Replace(text, string.Empty);
+        sanitized = NarrationMetadataLineRegex().Replace(sanitized, string.Empty);
 
         if (options.HideSecrets)
         {
@@ -387,8 +388,11 @@ public static partial class TtsTextSanitizer
     [GeneratedRegex(@"^(?:dotnet|npm|node|python|py|git|rg|curl|pwsh|powershell|docker|kubectl|taskkill|Get-Process|Get-ChildItem|Select-String)\b")]
     private static partial Regex CommonShellCommandRegex();
 
-    [GeneratedRegex(@"(?im)^[ \t]*(?:run|ran|running)(?:\s+(?:(?:a|the|\d+)\s+)?commands?|\s+(?:the\s+)?tests?)?[ \t]*(?:[>›…])?[ \t]*(?:\r?\n|$)")]
+    [GeneratedRegex(@"(?im)^[ \t]*(?:run|ran|running)(?:(?:\s+(?:(?:a|the|\d+)\s+)?commands?|\s+(?:the\s+)?tests?)|(?:\s+[`$&./\\].*))?[ \t]*(?:[>›…])?[ \t]*(?:\r?\n|$)")]
     private static partial Regex ServiceActivityLineRegex();
+
+    [GeneratedRegex(@"(?im)^[ \t]*(?:answer|final answer|response|analysis|reasoning|commentary|tool|tool call|tool output|system|developer|user|you|ответ|финальный ответ|анализ|рассуждение|система|пользователь|інструмент|відповідь|аналіз|міркування|система|користувач)[ \t]*[:\-—]?[ \t]*(?:\r?\n|$)")]
+    private static partial Regex NarrationMetadataLineRegex();
 
     [GeneratedRegex(@"!\[(?<alt>[^\]]*)\]\([^\)]*\)")]
     private static partial Regex MarkdownImageRegex();

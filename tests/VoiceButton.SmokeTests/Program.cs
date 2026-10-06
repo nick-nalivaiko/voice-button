@@ -38,6 +38,7 @@ Require(memoryGrowth < 128L * 1024 * 1024, $"PCM soak grew private memory by {me
 Require(ExistingFiles(pcmDirectory).SetEquals(pcmFilesBefore), "PCM temporary files were not removed.");
 TestHighPassResponse(format);
 TestNoxAddressing();
+TestSpeechListSanitization();
 
 var testRoot = Path.Combine(Path.GetTempPath(), "VoiceButton", "smoke", Guid.NewGuid().ToString("N"));
 try
@@ -54,7 +55,7 @@ finally
 }
 
 Console.WriteLine(
-    $"PASS: {pcmCycles} PCM sessions, memory growth {memoryGrowth / 1024d / 1024d:F1} MiB, 100 Hz high-pass response, Nox routing, temp cleanup and bounded MP3 cache verified.");
+    $"PASS: {pcmCycles} PCM sessions, memory growth {memoryGrowth / 1024d / 1024d:F1} MiB, 100 Hz high-pass response, Nox routing, list speech, temp cleanup and bounded MP3 cache verified.");
 
 static void TestNoxAddressing()
 {
@@ -77,6 +78,37 @@ static void TestNoxAddressing()
     Require(
         !NoksIntegrationService.TryExtractAddressedMessage("Сегодня обсуждали Noks в Codex", out _),
         "Nox mentioned inside ordinary dictation must not trigger routing.");
+}
+
+static void TestSpeechListSanitization()
+{
+    const string source = """
+        Что можно сделать:
+        - Первый обычный пункт.
+        - Второй обычный пункт.
+
+        ```csharp
+        var secretImplementation = BuildInternalValue();
+        ```
+        """;
+    var options = new TtsTextSanitizerOptions(
+        HideFilePaths: true,
+        HideCodeBlocks: true,
+        HideInlineCode: true,
+        ShortenLinks: true,
+        HideSecrets: true,
+        ShortenHashes: true,
+        CollapseStackTraces: true,
+        RemoveMarkdownNoise: true,
+        CollapseTables: true,
+        CollapseStructuredData: true,
+        ShortenShellCommands: true,
+        HideLongNumbers: true);
+    var sanitized = TtsTextSanitizer.Sanitize(source, options);
+
+    Require(sanitized.Contains("Первый обычный пункт.", StringComparison.Ordinal), "The first list item was removed from speech.");
+    Require(sanitized.Contains("Второй обычный пункт.", StringComparison.Ordinal), "The second list item was removed from speech.");
+    Require(!sanitized.Contains("secretImplementation", StringComparison.Ordinal), "A fenced code block leaked into speech.");
 }
 
 static void TestCapturedStream(string root)

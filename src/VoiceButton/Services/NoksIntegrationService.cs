@@ -342,7 +342,11 @@ public sealed class NoksIntegrationService(
 
         foreach (AutomationElement element in descendants)
         {
-            if (SafeControlType(element) != ControlType.Text || !IsLeaf(element))
+            var controlType = SafeControlType(element);
+            var isListItem = controlType == ControlType.ListItem;
+            if ((!isListItem && controlType != ControlType.Text)
+                || (!isListItem && !IsLeaf(element))
+                || (controlType == ControlType.Text && IsInsideListItem(element)))
             {
                 continue;
             }
@@ -369,7 +373,7 @@ public sealed class NoksIntegrationService(
                 groups.Add(key, group);
             }
 
-            group.Fragments.Add(new NoksTextFragment(text, bounds));
+            group.Fragments.Add(new NoksTextFragment(text, bounds, isListItem));
         }
 
         var ordered = groups.Values
@@ -569,6 +573,7 @@ public sealed class NoksIntegrationService(
         {
             if (previous is not null
                 && string.Equals(previous.Text, fragment.Text, StringComparison.Ordinal)
+                && previous.IsListItem == fragment.IsListItem
                 && Math.Abs(previous.Bounds.Top - fragment.Bounds.Top) < 3)
             {
                 continue;
@@ -577,7 +582,14 @@ public sealed class NoksIntegrationService(
             if (builder.Length > 0)
             {
                 var gap = previous is null ? 0 : fragment.Bounds.Top - previous.Bounds.Bottom;
-                builder.Append(gap > 12 ? "\n\n" : " ");
+                builder.Append(fragment.IsListItem || previous?.IsListItem == true
+                    ? "\n"
+                    : gap > 12 ? "\n\n" : " ");
+            }
+
+            if (fragment.IsListItem)
+            {
+                builder.Append("- ");
             }
 
             builder.Append(fragment.Text);
@@ -695,6 +707,40 @@ public sealed class NoksIntegrationService(
         {
             return false;
         }
+    }
+
+    private static bool IsInsideListItem(AutomationElement element)
+    {
+        var current = element;
+        for (var depth = 0; depth < 6; depth++)
+        {
+            try
+            {
+                var parent = TreeWalker.ControlViewWalker.GetParent(current);
+                if (parent is null)
+                {
+                    return false;
+                }
+
+                if (SafeControlType(parent) == ControlType.ListItem)
+                {
+                    return true;
+                }
+
+                if (ContainsAny(SafeClassName(parent), "message-row"))
+                {
+                    return false;
+                }
+
+                current = parent;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private static string GetRuntimeKey(AutomationElement element)
@@ -833,7 +879,7 @@ public sealed class NoksIntegrationService(
         }
     }
 
-    private sealed record NoksTextFragment(string Text, WpfRect Bounds);
+    private sealed record NoksTextFragment(string Text, WpfRect Bounds, bool IsListItem);
 
     private sealed record NoksMessageGroup(AutomationElement Container, WpfRect Bounds)
     {

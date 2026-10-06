@@ -40,7 +40,7 @@ public sealed class AppSettings
 
     public bool EnableNoksIntegration { get; set; } = true;
 
-    public string NoksConversationName { get; set; } = "Noks";
+    public string NoksConversationName { get; set; } = "Nox";
 
     public bool EnableCodexLiveNarration { get; set; } = true;
 

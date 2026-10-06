@@ -37,7 +37,7 @@ var memoryGrowth = Math.Max(0, privateBytesAfter - privateBytesBefore);
 Require(memoryGrowth < 128L * 1024 * 1024, $"PCM soak grew private memory by {memoryGrowth:N0} bytes.");
 Require(ExistingFiles(pcmDirectory).SetEquals(pcmFilesBefore), "PCM temporary files were not removed.");
 TestHighPassResponse(format);
-TestNoksAddressing();
+TestNoxAddressing();
 
 var testRoot = Path.Combine(Path.GetTempPath(), "VoiceButton", "smoke", Guid.NewGuid().ToString("N"));
 try
@@ -54,25 +54,29 @@ finally
 }
 
 Console.WriteLine(
-    $"PASS: {pcmCycles} PCM sessions, memory growth {memoryGrowth / 1024d / 1024d:F1} MiB, 100 Hz high-pass response, Noks routing, temp cleanup and bounded MP3 cache verified.");
+    $"PASS: {pcmCycles} PCM sessions, memory growth {memoryGrowth / 1024d / 1024d:F1} MiB, 100 Hz high-pass response, Nox routing, temp cleanup and bounded MP3 cache verified.");
 
-static void TestNoksAddressing()
+static void TestNoxAddressing()
 {
+    Require(
+        NoksIntegrationService.TryExtractAddressedMessage("Nox, включи вечерний режим", out var currentName)
+        && currentName == "включи вечерний режим",
+        "Current Nox address was not recognized.");
     Require(
         NoksIntegrationService.TryExtractAddressedMessage("Noks, проверь календарь", out var englishName)
         && englishName == "проверь календарь",
-        "Noks address was not removed from a routed dictation.");
+        "Legacy Noks address was not removed from a routed dictation.");
     Require(
         NoksIntegrationService.TryExtractAddressedMessage("Привет Нокс: напомни позвонить", out var russianName)
         && russianName == "напомни позвонить",
-        "Russian Noks address was not recognized.");
+        "Russian Nox address was not recognized.");
     Require(
         NoksIntegrationService.TryExtractAddressedMessage("Hi Knox send the summary", out var asrVariant)
         && asrVariant == "send the summary",
-        "Common ASR variant of Noks was not recognized.");
+        "Common ASR variant of Nox was not recognized.");
     Require(
         !NoksIntegrationService.TryExtractAddressedMessage("Сегодня обсуждали Noks в Codex", out _),
-        "Noks mentioned inside ordinary dictation must not trigger routing.");
+        "Nox mentioned inside ordinary dictation must not trigger routing.");
 }
 
 static void TestCapturedStream(string root)

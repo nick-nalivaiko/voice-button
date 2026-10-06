@@ -96,6 +96,13 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _appSettings = _appSettingsStore.Load();
+        if (string.IsNullOrWhiteSpace(_appSettings.NoksConversationName)
+            || string.Equals(_appSettings.NoksConversationName.Trim(), "Noks", StringComparison.OrdinalIgnoreCase))
+        {
+            _appSettings.NoksConversationName = "Nox";
+            _appSettingsStore.Save(_appSettings);
+        }
+
         if (!AppStorage.IsPortable)
         {
             EnvFile.LoadNearest();

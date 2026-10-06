@@ -990,13 +990,13 @@
                                 <ToggleButton x:Name="ClipboardFallbackToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
                             </Grid>
 
-                            <TextBlock x:Name="NoksIntegrationSectionTitleText" Style="{StaticResource SectionTitle}" Text="Noks" Margin="0,0,0,12" />
+                            <TextBlock x:Name="NoksIntegrationSectionTitleText" Style="{StaticResource SectionTitle}" Text="Nox" Margin="0,0,0,12" />
                             <Grid Margin="0,0,0,24">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBlock Style="{StaticResource RowIcon}" Text="&#xE77B;" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
-                                    <TextBlock x:Name="NoksIntegrationLabelText" Style="{StaticResource FieldLabel}" Text="Интеграция с Noks" />
-                                    <TextBlock x:Name="NoksIntegrationHintText" Style="{StaticResource FieldHint}" Text="Команда «Noks, …» отправляет диктовку в закрепленный чат; динамик озвучивает его последний ответ." />
+                                    <TextBlock x:Name="NoksIntegrationLabelText" Style="{StaticResource FieldLabel}" Text="Интеграция с Nox" />
+                                    <TextBlock x:Name="NoksIntegrationHintText" Style="{StaticResource FieldHint}" Text="Команда «Nox, …» отправляет диктовку в закрепленный чат; динамик озвучивает его последний ответ." />
                                 </StackPanel>
                                 <ToggleButton x:Name="NoksIntegrationToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
                             </Grid>

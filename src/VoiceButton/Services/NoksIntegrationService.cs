@@ -38,7 +38,7 @@ public sealed class NoksIntegrationService(
         }
 
         var window = windowFinder.FindBestWindow(AssistantAppKind.Codex)
-            ?? throw new InvalidOperationException("Для отправки сообщения открой Codex и чат Noks.");
+            ?? throw new InvalidOperationException("Для отправки сообщения открой Codex и чат Nox.");
 
         if (NativeMethods.IsIconic(window.Handle))
         {
@@ -51,15 +51,15 @@ public sealed class NoksIntegrationService(
         var conversation = FindConversationEntry(window.Element);
         if (conversation is null)
         {
-            throw new InvalidOperationException("Не найден чат Noks в боковой панели Codex.");
+            throw new InvalidOperationException("Не найден чат Nox в боковой панели Codex.");
         }
 
-        report("Noks", "Открываю чат и отправляю сообщение.");
+        report("Nox", "Открываю чат и отправляю сообщение.");
         InvokeOrClick(conversation);
         await Task.Delay(650, cancellationToken);
 
         var composer = await FindComposerAsync(window.Element, cancellationToken)
-            ?? throw new InvalidOperationException("Не найдено поле ввода Noks.");
+            ?? throw new InvalidOperationException("Не найдено поле ввода Nox.");
         FocusOrClick(composer);
         await Task.Delay(120, cancellationToken);
 
@@ -67,13 +67,13 @@ public sealed class NoksIntegrationService(
         await clipboardService.SetTextAsync(message, cancellationToken);
         if (!NativeMethods.SendPasteShortcut())
         {
-            throw new InvalidOperationException("Windows не удалось вставить сообщение в Noks.");
+            throw new InvalidOperationException("Windows не удалось вставить сообщение в Nox.");
         }
 
         await Task.Delay(220, cancellationToken);
         if (!NativeMethods.SendEnterKey())
         {
-            throw new InvalidOperationException("Windows не удалось отправить сообщение в Noks.");
+            throw new InvalidOperationException("Windows не удалось отправить сообщение в Nox.");
         }
 
         if (settings.RestoreClipboardAfterDictation)
@@ -82,7 +82,7 @@ public sealed class NoksIntegrationService(
             previousClipboard.Restore();
         }
 
-        diagnosticsLog.Info("Noks dictation routing", $"state=sent, chars={message.Length}");
+        diagnosticsLog.Info("Nox dictation routing", $"state=sent, chars={message.Length}");
         return true;
     }
 
@@ -99,30 +99,30 @@ public sealed class NoksIntegrationService(
         var conversation = FindConversationEntry(window.Element);
         if (conversation is null)
         {
-            diagnosticsLog.Info("Noks answer capture", "state=not-applicable, conversation-entry=missing");
+            diagnosticsLog.Info("Nox answer capture", "state=not-applicable, conversation-entry=missing");
             return null;
         }
 
-        var isSelected = IsSelectedConversation(conversation);
+        var isSelected = IsSelectedConversation(window.Element, conversation, GetConversationNames());
         diagnosticsLog.Info(
-            "Noks answer capture",
+            "Nox answer capture",
             $"state=selection-check, selected={isSelected}, bounds={SafeBounds(conversation)}");
         if (!isSelected)
         {
             return null;
         }
 
-        report("Noks", "Копирую последний ответ в clipboard.");
+        report("Nox", "Копирую последний ответ в clipboard.");
         var extraction = ExtractLatestAssistantAnswer(window.Element, conversation);
         if (extraction is null || string.IsNullOrWhiteSpace(extraction.Text))
         {
-            diagnosticsLog.Info("Noks answer capture", "state=failed, reason=no-confident-assistant-message");
-            throw new InvalidOperationException("Не удалось уверенно выделить последний ответ Noks. Прокрути его в видимую область и попробуй снова.");
+            diagnosticsLog.Info("Nox answer capture", "state=failed, reason=no-confident-assistant-message");
+            throw new InvalidOperationException("Не удалось уверенно выделить последний ответ Nox. Прокрути его в видимую область и попробуй снова.");
         }
 
         TrySelect(extraction.Container);
         await clipboardService.SetTextAsync(extraction.Text, cancellationToken);
-        diagnosticsLog.Info("Noks answer capture", $"state=copied, chars={extraction.Text.Length}");
+        diagnosticsLog.Info("Nox answer capture", $"state=copied, chars={extraction.Text.Length}");
         return new NoksAnswerCapture(extraction.Text, 1);
     }
 
@@ -138,27 +138,63 @@ public sealed class NoksIntegrationService(
             return null;
         }
 
-        var expectedName = string.IsNullOrWhiteSpace(settings.NoksConversationName)
-            ? "Noks"
-            : settings.NoksConversationName.Trim();
+        var expectedNames = GetConversationNames();
+        var rootBounds = SafeBounds(root);
         foreach (AutomationElement element in descendants)
         {
-            if (!string.Equals(SafeName(element).Trim(), expectedName, StringComparison.OrdinalIgnoreCase))
+            if (SafeControlType(element) != ControlType.Button
+                || !expectedNames.Contains(SafeName(element).Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var bounds = SafeBounds(element);
+            if (IsSidebarConversationBounds(bounds, rootBounds))
+            {
+                return element;
+            }
+        }
+
+        foreach (AutomationElement element in descendants)
+        {
+            if (!expectedNames.Contains(SafeName(element).Trim(), StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
 
             var row = FindSelectableAncestor(element) ?? element;
             var bounds = SafeBounds(row);
-            var rootBounds = SafeBounds(root);
-            if (!bounds.IsEmpty
-                && (rootBounds.IsEmpty || bounds.Left < rootBounds.Left + rootBounds.Width * 0.38))
+            if (SafeControlType(row) != ControlType.Document
+                && IsSidebarConversationBounds(bounds, rootBounds))
             {
                 return row;
             }
         }
 
         return null;
+    }
+
+    private static bool IsSidebarConversationBounds(WpfRect bounds, WpfRect rootBounds)
+    {
+        return !bounds.IsEmpty
+            && bounds.Height <= 96
+            && (rootBounds.IsEmpty
+                || (bounds.Left < rootBounds.Left + rootBounds.Width * 0.38
+                    && bounds.Width <= rootBounds.Width * 0.42));
+    }
+
+    private IReadOnlyList<string> GetConversationNames()
+    {
+        return new[]
+            {
+                settings.NoksConversationName?.Trim(),
+                "Nox",
+                "Noks"
+            }
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static AutomationElement? FindSelectableAncestor(AutomationElement element)
@@ -192,7 +228,10 @@ public sealed class NoksIntegrationService(
         return null;
     }
 
-    private static bool IsSelectedConversation(AutomationElement element)
+    private static bool IsSelectedConversation(
+        AutomationElement root,
+        AutomationElement element,
+        IReadOnlyList<string> conversationNames)
     {
         var current = element;
         for (var depth = 0; depth < 6; depth++)
@@ -231,7 +270,43 @@ public sealed class NoksIntegrationService(
             }
         }
 
-        return LooksVisuallySelected(element);
+        if (IsNamedConversationDocument(root, conversationNames))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsNamedConversationDocument(
+        AutomationElement root,
+        IReadOnlyList<string> conversationNames)
+    {
+        try
+        {
+            if (root.Current.ControlType == ControlType.Document
+                && conversationNames.Contains(SafeName(root).Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var documents = root.FindAll(
+                TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Document));
+            foreach (AutomationElement document in documents)
+            {
+                if (conversationNames.Contains(SafeName(document).Trim(), StringComparer.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+            // Accessibility state was unavailable; do not guess from content or colors.
+        }
+
+        return false;
     }
 
     private static NoksAnswerExtraction? ExtractLatestAssistantAnswer(
@@ -255,10 +330,14 @@ public sealed class NoksIntegrationService(
             return null;
         }
 
-        var contentLeft = conversationBounds.Right + 18;
-        var contentWidth = Math.Max(1, rootBounds.Right - contentLeft);
+        var paneBounds = FindThreadPaneBounds(descendants, rootBounds, conversationBounds.Right);
+        var contentBounds = paneBounds.IsEmpty
+            ? new WpfRect(conversationBounds.Right + 18, rootBounds.Top, Math.Max(1, rootBounds.Right - conversationBounds.Right - 18), rootBounds.Height)
+            : new WpfRect(paneBounds.Left, rootBounds.Top, paneBounds.Width, rootBounds.Height);
+        var contentLeft = contentBounds.Left;
+        var contentWidth = Math.Max(1, contentBounds.Width);
         var assistantLeftLimit = contentLeft + contentWidth * 0.31;
-        var composerTop = FindComposerTop(descendants, rootBounds, contentLeft);
+        var composerTop = FindComposerTop(descendants, contentBounds);
         var groups = new Dictionary<string, NoksMessageGroup>(StringComparer.Ordinal);
 
         foreach (AutomationElement element in descendants)
@@ -270,12 +349,18 @@ public sealed class NoksIntegrationService(
 
             var text = NormalizeText(SafeName(element));
             var bounds = SafeBounds(element);
-            if (!IsUsefulMessageFragment(text, bounds, rootBounds, contentLeft, composerTop))
+            var container = FindMessageContainer(element, root, contentBounds, composerTop);
+            var isMessageRow = ContainsAny(SafeClassName(container), "message-row");
+            if (!paneBounds.IsEmpty && !isMessageRow)
             {
                 continue;
             }
 
-            var container = FindMessageContainer(element, root, rootBounds, contentLeft, composerTop);
+            if (!IsUsefulMessageFragment(text, bounds, contentBounds, composerTop, isMessageRow))
+            {
+                continue;
+            }
+
             var containerBounds = SafeBounds(container);
             var key = GetRuntimeKey(container);
             if (!groups.TryGetValue(key, out var group))
@@ -333,10 +418,41 @@ public sealed class NoksIntegrationService(
             : new NoksAnswerExtraction(answer.Trim(), selected[0].Container);
     }
 
-    private static double FindComposerTop(
+    private static WpfRect FindThreadPaneBounds(
         AutomationElementCollection descendants,
         WpfRect rootBounds,
-        double contentLeft)
+        double sidebarRight)
+    {
+        var candidates = new List<WpfRect>();
+        foreach (AutomationElement element in descendants)
+        {
+            if (!ContainsAny(SafeClassName(element), "thread-pane"))
+            {
+                continue;
+            }
+
+            var bounds = SafeBounds(element);
+            if (!bounds.IsEmpty
+                && bounds.Left >= sidebarRight
+                && bounds.Width >= 300
+                && bounds.Width <= rootBounds.Width * 0.65
+                && bounds.Height >= rootBounds.Height * 0.55)
+            {
+                candidates.Add(bounds);
+            }
+        }
+
+        return candidates.Count == 0
+            ? WpfRect.Empty
+            : candidates
+                .OrderBy(bounds => bounds.Left)
+                .ThenBy(bounds => bounds.Width)
+                .First();
+    }
+
+    private static double FindComposerTop(
+        AutomationElementCollection descendants,
+        WpfRect contentBounds)
     {
         var candidates = new List<WpfRect>();
         foreach (AutomationElement element in descendants)
@@ -349,25 +465,25 @@ public sealed class NoksIntegrationService(
 
             var bounds = SafeBounds(element);
             if (!bounds.IsEmpty
-                && bounds.Left > contentLeft
+                && bounds.Left >= contentBounds.Left
+                && bounds.Right <= contentBounds.Right + 2
                 && bounds.Width > 220
-                && bounds.Bottom > rootBounds.Bottom - 240)
+                && bounds.Bottom > contentBounds.Bottom - 240)
             {
                 candidates.Add(bounds);
             }
         }
 
-        return candidates.Count == 0 ? rootBounds.Bottom - 72 : candidates.Min(bounds => bounds.Top);
+        return candidates.Count == 0 ? contentBounds.Bottom - 72 : candidates.Min(bounds => bounds.Top);
     }
 
     private static AutomationElement FindMessageContainer(
         AutomationElement element,
         AutomationElement root,
-        WpfRect rootBounds,
-        double contentLeft,
+        WpfRect contentBounds,
         double composerTop)
     {
-        var contentWidth = Math.Max(1, rootBounds.Right - contentLeft);
+        var contentWidth = Math.Max(1, contentBounds.Width);
         var best = element;
         var current = element;
         for (var depth = 0; depth < 9; depth++)
@@ -388,11 +504,16 @@ public sealed class NoksIntegrationService(
             }
 
             current = parent;
+            if (ContainsAny(SafeClassName(current), "message-row"))
+            {
+                return current;
+            }
+
             var bounds = SafeBounds(parent);
             if (bounds.IsEmpty
-                || bounds.Left < contentLeft + 20
-                || bounds.Right > rootBounds.Right - 8
-                || bounds.Top < rootBounds.Top + 34
+                || bounds.Left < contentBounds.Left + 20
+                || bounds.Right > contentBounds.Right - 8
+                || bounds.Top < contentBounds.Top + 34
                 || bounds.Bottom > composerTop - 2)
             {
                 continue;
@@ -400,7 +521,7 @@ public sealed class NoksIntegrationService(
 
             if (bounds.Width >= 180
                 && bounds.Width <= contentWidth * 0.62
-                && bounds.Height <= rootBounds.Height * 0.82)
+                && bounds.Height <= contentBounds.Height * 0.82)
             {
                 best = parent;
             }
@@ -411,6 +532,17 @@ public sealed class NoksIntegrationService(
 
     private static bool IsAssistantGroup(NoksMessageGroup group, double assistantLeftLimit)
     {
+        var className = SafeClassName(group.Container);
+        if (ContainsAny(className, "message-row self"))
+        {
+            return false;
+        }
+
+        if (ContainsAny(className, "message-row"))
+        {
+            return true;
+        }
+
         var metadata = SafeSearchText(group.Container);
         if (ContainsAny(metadata, "user message", "message from you", "your message", "сообщение пользователя", "ваше сообщение"))
         {
@@ -422,88 +554,7 @@ public sealed class NoksIntegrationService(
             return true;
         }
 
-        if (LooksLikeUserBubble(group.Bounds))
-        {
-            return false;
-        }
-
         return group.Bounds.Left <= assistantLeftLimit;
-    }
-
-    private static bool LooksVisuallySelected(AutomationElement element)
-    {
-        var bounds = SafeBounds(element);
-        if (bounds.IsEmpty || bounds.Width < 80 || bounds.Height < 18)
-        {
-            return false;
-        }
-
-        var points = new[]
-        {
-            (X: bounds.Right - 14, Y: bounds.Top + bounds.Height / 2),
-            (X: bounds.Left + bounds.Width * 0.72, Y: bounds.Top + bounds.Height / 2)
-        };
-        foreach (var point in points)
-        {
-            if (!TrySamplePixel(point.X, point.Y, out var red, out var green, out var blue))
-            {
-                continue;
-            }
-
-            var maximum = Math.Max(red, Math.Max(green, blue));
-            var minimum = Math.Min(red, Math.Min(green, blue));
-            var luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-            if (maximum - minimum <= 24 && luminance >= 42 && luminance <= 105)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool LooksLikeUserBubble(WpfRect bounds)
-    {
-        var points = new[]
-        {
-            (X: bounds.Left - 6, Y: bounds.Top + Math.Min(12, bounds.Height / 2)),
-            (X: bounds.Left + 7, Y: bounds.Top + Math.Min(12, bounds.Height / 2)),
-            (X: bounds.Left + 7, Y: bounds.Top + bounds.Height / 2)
-        };
-        foreach (var point in points)
-        {
-            if (TrySamplePixel(point.X, point.Y, out var red, out var green, out var blue)
-                && red > 125
-                && green > 85
-                && red - blue > 45)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool TrySamplePixel(double x, double y, out byte red, out byte green, out byte blue)
-    {
-        red = 0;
-        green = 0;
-        blue = 0;
-        try
-        {
-            using var bitmap = new System.Drawing.Bitmap(1, 1);
-            using var graphics = System.Drawing.Graphics.FromImage(bitmap);
-            graphics.CopyFromScreen((int)Math.Round(x), (int)Math.Round(y), 0, 0, new System.Drawing.Size(1, 1));
-            var color = bitmap.GetPixel(0, 0);
-            red = color.R;
-            green = color.G;
-            blue = color.B;
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private static string JoinFragments(IReadOnlyList<NoksTextFragment> fragments)
@@ -539,19 +590,23 @@ public sealed class NoksIntegrationService(
     private static bool IsUsefulMessageFragment(
         string text,
         WpfRect bounds,
-        WpfRect rootBounds,
-        double contentLeft,
-        double composerTop)
+        WpfRect contentBounds,
+        double composerTop,
+        bool isMessageRow)
     {
         if (string.IsNullOrWhiteSpace(text)
             || bounds.IsEmpty
             || bounds.Width <= 1
             || bounds.Height <= 1
-            || bounds.Left <= contentLeft + 20
-            || bounds.Right >= rootBounds.Right - 6
-            || bounds.Top <= rootBounds.Top + 34
-            || bounds.Bottom >= composerTop - 4
-            || TimestampPattern.IsMatch(text))
+            || bounds.Left <= contentBounds.Left + 20
+            || bounds.Right >= contentBounds.Right - 6
+            || (!isMessageRow
+                && (bounds.Top <= contentBounds.Top + 34
+                    || bounds.Bottom >= composerTop - 4))
+            || TimestampPattern.IsMatch(text)
+            || string.Equals(text, "Read", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "ChatGPT said:", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "You said:", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -697,7 +752,7 @@ public sealed class NoksIntegrationService(
         var bounds = SafeBounds(element);
         if (bounds.IsEmpty)
         {
-            throw new InvalidOperationException("Элемент Noks найден без доступных координат.");
+            throw new InvalidOperationException("Элемент Nox найден без доступных координат.");
         }
 
         var x = (uint)Math.Round(bounds.Left + bounds.Width / 2);
@@ -734,7 +789,19 @@ public sealed class NoksIntegrationService(
         try
         {
             var current = element.Current;
-            return string.Join(" ", current.Name, current.AutomationId, current.HelpText, current.ItemStatus);
+            return string.Join(" ", current.Name, current.AutomationId, current.HelpText, current.ItemStatus, current.ClassName);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string SafeClassName(AutomationElement element)
+    {
+        try
+        {
+            return element.Current.ClassName ?? string.Empty;
         }
         catch
         {

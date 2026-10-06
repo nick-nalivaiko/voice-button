@@ -1018,7 +1018,7 @@
                                 <TextBlock Style="{StaticResource RowIcon}" Text="&#xE720;" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock x:Name="RetryMicrophoneLabelText" Style="{StaticResource FieldLabel}" Text="Повторять запуск микрофона" />
-                                    <TextBlock x:Name="RetryMicrophoneHintText" Style="{StaticResource FieldHint}" Text="Повторяет клик только если панель Codex не изменилась; активная запись не выключается." />
+                                    <TextBlock x:Name="RetryMicrophoneHintText" Style="{StaticResource FieldHint}" Text="Повторяет клик, если кнопка Codex не перешла в режим остановки записи." />
                                 </StackPanel>
                                 <ToggleButton x:Name="RetryMicrophoneToggle" Grid.Column="2" Style="{StaticResource NeonToggle}" Checked="IntegrationToggle_Changed" Unchecked="IntegrationToggle_Changed" />
                             </Grid>

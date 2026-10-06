@@ -175,7 +175,7 @@ public partial class MainWindow
         ["LiveNarrationUnavailableDetail"] = new[] { "Сначала включите функцию в разделе «Интеграция».", "Спочатку увімкніть функцію в розділі «Інтеграція».", "Enable the feature in Integration settings first." },
         ["MicrophoneIntegrationSectionTitle"] = new[] { "Микрофон приложений", "Мікрофон програм", "Application microphone" },
         ["RetryMicrophoneLabel"] = new[] { "Повторять запуск микрофона", "Повторювати запуск мікрофона", "Retry microphone launch" },
-        ["RetryMicrophoneHint"] = new[] { "Повторяет клик только если панель Codex не изменилась; активная запись не выключается.", "Повторює клік лише якщо панель Codex не змінилася; активний запис не вимикається.", "Retries only when the Codex input panel did not change; active recording is never toggled off." },
+        ["RetryMicrophoneHint"] = new[] { "Повторяет клик, если кнопка Codex не перешла в режим остановки записи.", "Повторює клік, якщо кнопка Codex не перейшла в режим зупинки запису.", "Retries when the Codex button did not switch to the stop-recording state." },
         ["DiagnosticsSectionTitle"] = new[] { "Диагностика", "Діагностика", "Diagnostics" },
         ["DiagnosticsLabel"] = new[] { "Проверить активное приложение", "Перевірити активну програму", "Check active application" },
         ["DiagnosticsHint"] = new[] { "Проверяет окно, Copy и микрофон. Результат пишется в diagnostics.log.", "Перевіряє вікно, Copy і мікрофон. Результат пишеться в diagnostics.log.", "Checks the window, Copy, and microphone. Results are written to diagnostics.log." },

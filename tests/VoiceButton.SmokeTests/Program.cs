@@ -39,6 +39,7 @@ Require(ExistingFiles(pcmDirectory).SetEquals(pcmFilesBefore), "PCM temporary fi
 TestHighPassResponse(format);
 TestNoxAddressing();
 TestSpeechListSanitization();
+TestMicrophoneRetryDetection();
 
 var testRoot = Path.Combine(Path.GetTempPath(), "VoiceButton", "smoke", Guid.NewGuid().ToString("N"));
 try
@@ -55,7 +56,20 @@ finally
 }
 
 Console.WriteLine(
-    $"PASS: {pcmCycles} PCM sessions, memory growth {memoryGrowth / 1024d / 1024d:F1} MiB, 100 Hz high-pass response, Nox routing, list speech, temp cleanup and bounded MP3 cache verified.");
+    $"PASS: {pcmCycles} PCM sessions, memory growth {memoryGrowth / 1024d / 1024d:F1} MiB, 100 Hz high-pass response, Nox routing, microphone retry detection, list speech, temp cleanup and bounded MP3 cache verified.");
+
+static void TestMicrophoneRetryDetection()
+{
+    Require(
+        !CodexMicrophoneService.IsVoiceInputActiveButtonText("Dictate   button"),
+        "Idle Dictate button was mistaken for active voice input.");
+    Require(
+        CodexMicrophoneService.IsVoiceInputActiveButtonText("Stop dictation   button"),
+        "Active Stop dictation button was not recognized.");
+    Require(
+        !CodexMicrophoneService.IsVoiceInputActiveButtonText("The answer discusses recording settings"),
+        "Conversation text must not be mistaken for active voice input.");
+}
 
 static void TestNoxAddressing()
 {

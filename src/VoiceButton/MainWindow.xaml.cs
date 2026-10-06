@@ -225,7 +225,7 @@ public partial class MainWindow : Window
             ShowFromTray,
             _appSettings.FloatingButtonAlwaysOnTop,
             SetFloatingButtonAlwaysOnTop,
-            () => _ = SpeakLatestAnswerAsync(),
+            () => _ = SpeakLatestAnswerAsync("tray-menu"),
             StopCurrentRun,
             ExitApplication);
 
@@ -344,7 +344,7 @@ public partial class MainWindow : Window
 
     private void SpeakButton_Click(object sender, RoutedEventArgs e)
     {
-        _ = SpeakLatestAnswerAsync();
+        _ = SpeakLatestAnswerAsync("settings-footer");
     }
 
     private void ClipboardButton_Click(object sender, RoutedEventArgs e)
@@ -538,7 +538,7 @@ public partial class MainWindow : Window
         switch (actionId)
         {
             case SpeakLatestHotkeyId:
-                _ = SpeakLatestAnswerAsync();
+                _ = SpeakLatestAnswerAsync("hotkey");
                 break;
             case ClipboardHotkeyId:
                 _ = SpeakClipboardFromFloatingAsync();
@@ -550,7 +550,7 @@ public partial class MainWindow : Window
                 _ = SendVoiceInputAsync();
                 break;
             case ToggleLiveNarrationHotkeyId:
-                ToggleLiveNarration();
+                ToggleLiveNarration("hotkey");
                 break;
         }
     }
@@ -1272,17 +1272,18 @@ public partial class MainWindow : Window
         UpdateFloatingNavigationState();
     }
 
-    private void ToggleLiveNarration()
+    private void ToggleLiveNarration(string source)
     {
         if (!_appSettings.EnableCodexLiveNarration)
         {
+            _diagnosticsLog.Info("Live narration control", $"source={source}, state=unavailable");
             SetStatus(Tr("LiveNarrationUnavailable"), Tr("LiveNarrationUnavailableDetail"), "#F9C74F", busy: false);
             return;
         }
 
         if (_liveNarrationActive)
         {
-            PauseLiveNarration();
+            PauseLiveNarration(source);
             return;
         }
 
@@ -1303,6 +1304,7 @@ public partial class MainWindow : Window
             _floatingButtonWindow?.SetLiveNarrationState(available: true, active: true);
             UpdateFloatingNavigationState();
             QueueLiveNarrationSnapshot(_liveNarrationSnapshot);
+            _diagnosticsLog.Info("Live narration control", $"source={source}, state=enabled");
             SetStatus(Tr("LiveNarrationOn"), Tr("LiveNarrationOnDetail"), "#41D6A1", busy: false);
         }
         catch (Exception ex)
@@ -1311,7 +1313,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PauseLiveNarration()
+    private void PauseLiveNarration(string source)
     {
         _liveNarrationActive = false;
         if (_currentRunIsLiveNarration)
@@ -1321,6 +1323,7 @@ public partial class MainWindow : Window
 
         _floatingButtonWindow?.SetLiveNarrationState(available: true, active: false);
         UpdateFloatingNavigationState();
+        _diagnosticsLog.Info("Live narration control", $"source={source}, state=paused");
         SetStatus(Tr("LiveNarrationPaused"), Tr("LiveNarrationPausedDetail"), "#F9C74F", busy: false);
     }
 
@@ -1989,10 +1992,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task SpeakLatestAnswerAsync()
+    private async Task SpeakLatestAnswerAsync(string requestSource)
     {
+        _diagnosticsLog.Info(
+            "Latest answer request",
+            $"source={requestSource}, liveActive={_liveNarrationActive}, replacing={_isReplacingLatest}, " +
+            $"dictation={_dictationRecorderService.IsRecording || _isDictationProcessing}, run={_currentRun is not null}");
+
         if (_isReplacingLatest)
         {
+            _diagnosticsLog.Info("Latest answer request", $"source={requestSource}, state=ignored, reason=capture-in-progress");
             return;
         }
 
@@ -2049,7 +2058,7 @@ public partial class MainWindow : Window
             UpdateFloatingNavigationState();
             _diagnosticsLog.Info(
                 "Latest answer capture",
-                $"chars={answer.Text.Length}, answers={answer.AnswerCount}");
+                $"source={requestSource}, chars={answer.Text.Length}, answers={answer.AnswerCount}");
             await CancelCurrentSpeechRunAndWaitAsync();
             _playbackStopped = false;
             _floatingButtonWindow?.SetResumeAvailable(false);
@@ -2801,14 +2810,14 @@ public partial class MainWindow : Window
         _floatingButtonWindow = new FloatingButtonWindow(
             () => _ = StartVoiceInputOrWhileStoppedAsync(),
             ResumeSavedPlayback,
-            () => _ = SpeakLatestAnswerAsync(),
+            () => _ = SpeakLatestAnswerAsync("floating-speaker"),
             () => _ = SpeakClipboardFromFloatingAsync(),
             NavigatePreviousSpeech,
             NavigateNextSpeech,
             _audioPlaybackService.TogglePause,
             _audioPlaybackService.Seek,
             StopCurrentRun,
-            ToggleLiveNarration,
+            () => ToggleLiveNarration("floating-indicator"),
             _appSettings,
             _codexWindowFinder,
             SaveFloatingButtonPosition);

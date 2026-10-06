@@ -22,6 +22,7 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **Clipboard protection**: restores the previous clipboard value when possible.
 - **Speech cleanup**: removes or shortens paths, code, links, secrets, hashes, stack traces, tables, structured data, shell commands, and long numeric identifiers.
 - **Long-answer support**: sanitizes and chunks long replies before sequential playback.
+- **Bounded audio memory**: decoded PCM is kept in disposable temporary files instead of an ever-growing RAM array; completed MP3 speech is limited to 20 sessions, 250 MB, and three days.
 - **Portable-friendly security**: API keys saved in the UI are stored in Windows Credential Manager, not inside the portable folder.
 - **Three interface languages**: English, Ukrainian, and Russian, selected from the Windows UI language on first launch.
 - **Tray support**: minimize to tray, optional Windows startup, remembered floating-button position, a persistent always-on-top toggle, and local diagnostics.
@@ -162,11 +163,21 @@ git config core.hooksPath .githooks
 6. The player and decoder receive a minimum two-second warm-up; each MP3 response then begins from a ten-second buffer, or as soon as a shorter clip is complete, while the remaining audio continues to arrive.
 7. Audio is played in order through the floating seekable player, with automatic rebuffering when needed.
 
+Decoded PCM exists only for the active playback session and is removed when that session ends. Completed compressed speech is cached under `%LOCALAPPDATA%\VoiceButton\AudioCache` so Stop/Resume and repeat playback do not require another OpenAI request. The cache retains at most 20 completed sessions for up to three days and 250 MB total; the newest completed session is protected when older entries are evicted. Raw dictation recordings are never persisted, and one recording is limited to ten minutes.
+
+Voice Button logs a memory warning at 1 GB of private memory. At 1.5 GB it cancels the active audio operation, clears disposable resources, and compacts managed memory rather than allowing the process to continue growing. Diagnostics rotate at 5 MB and expire after three days.
+
 When live Codex narration is enabled globally, Voice Button watches the visible accessibility tree for the current Codex work block. The attached corner control and its global hotkey pause or resume narration without losing the current position or queued paragraphs. Only assistant text below the active work marker and inside the assistant column is accepted, so user message bubbles and neighboring panels are ignored. Complete paragraphs are queued in order, inline language fragments remain in the same paragraph, and Codex activity labels such as `Run a command` or `Edited files` are skipped. Paragraphs are sanitized by the same speech filters and played one at a time through the existing player. Only the player's Stop button discards the current live queue while leaving the mode ready for the next new paragraph.
 
 The primary answer-reading path does not use screenshots or OCR.
 
 For dictation, Voice Button captures 16 kHz mono audio locally, sends the completed WAV recording to the selected OpenAI transcription model, restores the original target application, and sends Ctrl+V when keyboard focus still belongs to that target. The transcript remains available in the clipboard whenever insertion cannot be verified.
+
+The bounded audio soak test can be run with:
+
+```powershell
+dotnet run --project tests/VoiceButton.SmokeTests/VoiceButton.SmokeTests.csproj -c Release
+```
 
 ## Known limitations
 

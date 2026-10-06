@@ -1,11 +1,14 @@
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.IO;
+using System.Runtime;
 using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using WpfAutomationProperties = System.Windows.Automation.AutomationProperties;
 using VoiceButton.Models;
 using VoiceButton.Services;
@@ -22,7 +25,12 @@ public partial class MainWindow : Window
     private const string SendVoiceHotkeyId = "SendVoice";
     private const string ToggleLiveNarrationHotkeyId = "ToggleLiveNarration";
     private const int SpeechChunkMaxAttempts = 3;
+    private const int MaxLiveNarrationHistoryEntries = 20;
+    private const int MaxLiveNarrationQueueEntries = 50;
+    private const long MemoryWarningBytes = 1L * 1024 * 1024 * 1024;
+    private const long MemoryEmergencyBytes = 1536L * 1024 * 1024;
     private static readonly TimeSpan SpeechStreamStartTimeout = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan MaxDictationDuration = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan LiveNarrationDuplicateWindow = TimeSpan.FromMinutes(2);
     private const int MaxRecentLiveNarrationParagraphs = 512;
     private const string LiveNarrationInstructions =
@@ -45,17 +53,16 @@ public partial class MainWindow : Window
     private readonly AudioPlaybackService _audioPlaybackService;
     private readonly GlobalHotkeyService _hotkeyService = new();
     private readonly DiagnosticsLogService _diagnosticsLog = new();
+    private readonly SpeechAudioCache _speechAudioCache = new();
+    private readonly DispatcherTimer _memoryGuardTimer;
     private readonly Queue<LiveNarrationQueueItem> _liveNarrationQueue = [];
     private readonly HashSet<string> _handledLiveNarrationParagraphs = new(StringComparer.Ordinal);
+    private readonly Queue<string> _handledLiveNarrationKeys = [];
     private readonly Dictionary<LiveNarrationParagraphSignature, DateTime> _recentLiveNarrationParagraphs = [];
     private readonly List<LiveNarrationQueueItem> _liveNarrationHistory = [];
 
     private CancellationTokenSource? _currentRun;
     private CancellationTokenSource? _latestCaptureRun;
-    private readonly List<byte[]> _cachedAudioChunks = [];
-    private string? _cachedSpeechText;
-    private string? _cachedSpeechConfiguration;
-    private int _cachedSpeechChunkCount;
     private bool _playbackStopped;
     private bool _currentRunIsSpeech;
     private bool _currentRunIsLiveNarration;
@@ -80,6 +87,8 @@ public partial class MainWindow : Window
     private int _completedAnswerOffsetFromLatest;
     private int _completedAnswerCount;
     private bool _isNavigatingSpeech;
+    private bool _memoryWarningRaised;
+    private bool _memoryEmergencyRaised;
 
     public MainWindow()
     {
@@ -103,6 +112,8 @@ public partial class MainWindow : Window
         _dictationTextInsertionService = new DictationTextInsertionService(_clipboardService);
         _audioPlaybackService = new AudioPlaybackService(Dispatcher);
         _audioPlaybackService.PlaybackChanged += AudioPlaybackService_PlaybackChanged;
+        _memoryGuardTimer = new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Background, MemoryGuardTimer_Tick, Dispatcher);
+        _memoryGuardTimer.Start();
 
         _appSettings.InterfaceLanguage = NormalizeInterfaceLanguage(_appSettings.InterfaceLanguage);
         _appSettings.SpeechModel = NormalizeSpeechModel(_appSettings.SpeechModel);
@@ -255,16 +266,54 @@ public partial class MainWindow : Window
     {
         if (_exitRequested)
         {
-            _dictationRun?.Cancel();
-            _dictationRecorderService.Dispose();
-            _floatingButtonWindow?.Close();
-            _hotkeyService.Dispose();
-            _trayIconService?.Dispose();
+            DisposeApplicationShell();
             return;
         }
 
         e.Cancel = true;
         Hide();
+    }
+
+    private void MemoryGuardTimer_Tick(object? sender, EventArgs e)
+    {
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            process.Refresh();
+            var privateBytes = process.PrivateMemorySize64;
+
+            if (privateBytes >= MemoryEmergencyBytes && !_memoryEmergencyRaised)
+            {
+                _memoryEmergencyRaised = true;
+                _diagnosticsLog.Info("Memory guard", $"state=emergency, privateBytes={privateBytes}");
+                CancelCurrentRun();
+                _speechAudioCache.Prune();
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                SetStatus("Озвучка остановлена", "Voice Button освободил память после превышения 1,5 ГБ.", "#F25F5C", busy: false);
+                return;
+            }
+
+            if (privateBytes >= MemoryWarningBytes && !_memoryWarningRaised)
+            {
+                _memoryWarningRaised = true;
+                _diagnosticsLog.Info("Memory guard", $"state=warning, privateBytes={privateBytes}");
+            }
+
+            if (privateBytes < 768L * 1024 * 1024)
+            {
+                _memoryWarningRaised = false;
+            }
+
+            if (privateBytes < MemoryWarningBytes)
+            {
+                _memoryEmergencyRaised = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _diagnosticsLog.Error("Memory guard", ex);
+        }
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1192,6 +1241,7 @@ public partial class MainWindow : Window
         {
             _handledLiveNarrationSessionId = snapshot.SessionId;
             _handledLiveNarrationParagraphs.Clear();
+            _handledLiveNarrationKeys.Clear();
         }
 
         UpdateLiveNarrationHistory(snapshot);
@@ -1325,6 +1375,22 @@ public partial class MainWindow : Window
         {
             _liveNarrationHistoryPosition = _liveNarrationHistory.Count - 1;
         }
+
+        while (_liveNarrationHistory.Count > MaxLiveNarrationHistoryEntries)
+        {
+            var removed = _liveNarrationHistory[0];
+            _liveNarrationHistory.RemoveAt(0);
+            if (_liveNarrationHistoryPosition > 0)
+            {
+                _liveNarrationHistoryPosition--;
+            }
+            else if (_liveNarrationHistoryPosition == 0
+                     && _liveNarrationHistory.Count > 0
+                     && removed.Index != _liveNarrationHistory[0].Index)
+            {
+                _liveNarrationHistoryPosition = 0;
+            }
+        }
     }
 
     private void QueueLiveNarrationSnapshot(LiveNarrationSnapshot snapshot)
@@ -1347,6 +1413,12 @@ public partial class MainWindow : Window
                 continue;
             }
 
+            _handledLiveNarrationKeys.Enqueue(key);
+            while (_handledLiveNarrationKeys.Count > MaxRecentLiveNarrationParagraphs)
+            {
+                _handledLiveNarrationParagraphs.Remove(_handledLiveNarrationKeys.Dequeue());
+            }
+
             if (wasRecentlyQueued)
             {
                 _diagnosticsLog.Info(
@@ -1360,6 +1432,10 @@ public partial class MainWindow : Window
                 snapshot.SessionId,
                 paragraph.Index,
                 paragraph.Text));
+            while (_liveNarrationQueue.Count > MaxLiveNarrationQueueEntries)
+            {
+                _liveNarrationQueue.Dequeue();
+            }
         }
 
         StartLiveNarrationPump();
@@ -1751,6 +1827,7 @@ public partial class MainWindow : Window
             _dictationTarget = _dictationTextInsertionService.CaptureTarget();
             _dictationRun = new CancellationTokenSource();
             _dictationRecorderService.Start();
+            _ = StopDictationAtLimitAsync(_dictationRun);
             _floatingButtonWindow?.SetDictationState(recording: true, processing: false);
             _diagnosticsLog.Info(
                 "Dictation target captured",
@@ -1833,12 +1910,34 @@ public partial class MainWindow : Window
             _isDictationProcessing = false;
             _dictationTarget = null;
             _dictationRun = null;
+            run.Cancel();
             run.Dispose();
             _floatingButtonWindow?.SetDictationState(recording: false, processing: false);
             SetBusy(false);
             StartLiveNarrationPump();
         }
     }
+
+    private async Task StopDictationAtLimitAsync(CancellationTokenSource run)
+    {
+        try
+        {
+            await Task.Delay(MaxDictationDuration, run.Token);
+            if (!ReferenceEquals(_dictationRun, run) || !_dictationRecorderService.IsRecording)
+            {
+                return;
+            }
+
+            _diagnosticsLog.Info("Dictation", $"state=duration-limit, minutes={MaxDictationDuration.TotalMinutes:0}");
+            SetStatus(Tr("DictationTranscribing"), "Достигнут лимит записи 10 минут.", "#F9C74F", busy: true);
+            await StopDictationAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal completion cancels the duration watchdog.
+        }
+    }
+
     private async Task StartActiveVoiceInputAsync()
     {
         if (!TryStartRun(out var cancellationToken))
@@ -2179,38 +2278,43 @@ public partial class MainWindow : Window
         _diagnosticsLog.Info(
             "Speech pipeline",
             $"sourceChars={text.Length}, sanitizedChars={speakableText.Length}, chunks={chunks.Count}, chunkChars={string.Join(',', chunks.Select(chunk => chunk.Length))}, charsAfterLastTable={charsAfterLastTable}, maxChunkChars={_settings.MaxChunkLength}, singleChunk={keepAsSingleChunk}");
-        if (string.Equals(_cachedSpeechText, speakableText, StringComparison.Ordinal)
-            && string.Equals(_cachedSpeechConfiguration, speechConfiguration, StringComparison.Ordinal)
-            && _cachedSpeechChunkCount == chunks.Count
-            && _cachedAudioChunks.Count == chunks.Count)
+        var cacheKey = _speechAudioCache.CreateKey(speakableText, speechConfiguration);
+        if (_speechAudioCache.TryGetEntry(cacheKey, chunks.Count, out var cachedChunkPaths))
         {
-            await ReplayCachedAudioAsync(cancellationToken);
+            await ReplayCachedAudioAsync(cachedChunkPaths, cancellationToken);
             return;
         }
 
         EnsureApiKeyReady();
-        _cachedSpeechText = speakableText;
-        _cachedSpeechConfiguration = speechConfiguration;
-        _cachedSpeechChunkCount = chunks.Count;
-        _cachedAudioChunks.Clear();
-
-        for (var index = 0; index < chunks.Count; index++)
+        _speechAudioCache.BeginEntry(cacheKey);
+        try
         {
-            await PlaySpeechChunkWithRetryAsync(
-                chunks[index],
-                index,
-                chunks.Count,
-                cancellationToken,
-                instructionsOverride);
-        }
+            for (var index = 0; index < chunks.Count; index++)
+            {
+                await PlaySpeechChunkWithRetryAsync(
+                    chunks[index],
+                    index,
+                    chunks.Count,
+                    cacheKey,
+                    cancellationToken,
+                    instructionsOverride);
+            }
 
-        _diagnosticsLog.Info("Speech pipeline", $"state=completed, chunks={chunks.Count}");
+            _speechAudioCache.CompleteEntry(cacheKey, chunks.Count);
+            _diagnosticsLog.Info("Speech pipeline", $"state=completed, chunks={chunks.Count}");
+        }
+        catch
+        {
+            _speechAudioCache.AbortEntry(cacheKey);
+            throw;
+        }
     }
 
     private async Task PlaySpeechChunkWithRetryAsync(
         string chunk,
         int index,
         int chunkCount,
+        string cacheKey,
         CancellationToken cancellationToken,
         string? instructionsOverride)
     {
@@ -2236,7 +2340,8 @@ public partial class MainWindow : Window
                 _diagnosticsLog.Info(
                     "Speech chunk",
                     $"chunk={index + 1}/{chunkCount}, chars={chunk.Length}, attempt={attempt}, state=stream-ready");
-                using var capturedAudio = new CapturingReadStream(audio.AudioStream);
+                var cacheTarget = _speechAudioCache.GetChunkTarget(cacheKey, index);
+                using var capturedAudio = new CapturingReadStream(audio.AudioStream, cacheTarget.TemporaryPath);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 SetStatus("Озвучиваю", $"{index + 1}/{chunkCount}", "#41D6A1", busy: true);
@@ -2246,15 +2351,15 @@ public partial class MainWindow : Window
                     cancellationToken,
                     startStopped: _playbackStopped);
 
-                var capturedBytes = capturedAudio.ToArray();
-                if (capturedAudio.IsComplete && _cachedAudioChunks.Count == index)
+                var capturedBytes = capturedAudio.CapturedLength;
+                if (capturedAudio.IsComplete)
                 {
-                    _cachedAudioChunks.Add(capturedBytes);
+                    capturedAudio.CommitTo(cacheTarget.FinalPath);
                 }
 
                 _diagnosticsLog.Info(
                     "Speech chunk",
-                    $"chunk={index + 1}/{chunkCount}, chars={chunk.Length}, attempt={attempt}, capturedBytes={capturedBytes.Length}, state=completed");
+                    $"chunk={index + 1}/{chunkCount}, chars={chunk.Length}, attempt={attempt}, capturedBytes={capturedBytes}, state=completed");
                 return;
             }
             catch (OperationCanceledException)
@@ -2311,13 +2416,21 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task ReplayCachedAudioAsync(CancellationToken cancellationToken)
+    private async Task ReplayCachedAudioAsync(
+        IReadOnlyList<string> cachedChunkPaths,
+        CancellationToken cancellationToken)
     {
-        for (var index = 0; index < _cachedAudioChunks.Count; index++)
+        for (var index = 0; index < cachedChunkPaths.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            SetStatus("Воспроизвожу сохраненное аудио", $"{index + 1}/{_cachedAudioChunks.Count}", "#41D6A1", busy: true);
-            using var audio = new MemoryStream(_cachedAudioChunks[index], writable: false);
+            SetStatus("Воспроизвожу сохраненное аудио", $"{index + 1}/{cachedChunkPaths.Count}", "#41D6A1", busy: true);
+            using var audio = new FileStream(
+                cachedChunkPaths[index],
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                64 * 1024,
+                FileOptions.SequentialScan);
             await _audioPlaybackService.PlayStreamingAsync(
                 audio,
                 "mp3",
@@ -2739,6 +2852,9 @@ public partial class MainWindow : Window
 
     private void DisposeApplicationShell()
     {
+        _memoryGuardTimer.Stop();
+        _dictationRun?.Cancel();
+        _dictationRecorderService.Dispose();
         _liveNarrationMonitor.Dispose();
         _floatingButtonWindow?.Close();
         _floatingButtonWindow = null;

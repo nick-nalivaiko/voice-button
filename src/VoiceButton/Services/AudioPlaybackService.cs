@@ -228,6 +228,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                 }
 
                 StopAndDisposeOutput();
+                DisposeProvider();
             }
         }
 
@@ -320,7 +321,6 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
 
         public void SoftStop()
         {
-            WaveOutEvent? output;
             lock (_gate)
             {
                 if (_disposed)
@@ -330,10 +330,9 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
 
                 _transportStopped = true;
                 _userPaused = false;
-                output = _output;
             }
 
-            SafeStop(output);
+            StopAndDisposeOutput();
             publishSnapshot(PlaybackSnapshot.Inactive);
         }
 
@@ -420,6 +419,7 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
 
             Cancel();
             StopAndDisposeOutput();
+            DisposeProvider();
         }
 
         private void DecodeMp3(Stream audioStream, CancellationToken cancellationToken)
@@ -519,11 +519,13 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                 ProgressiveWaveProvider? provider;
                 Exception? decodeError;
                 bool downloadComplete;
+                bool transportStopped;
                 lock (_gate)
                 {
                     provider = _provider;
                     decodeError = _decodeError;
                     downloadComplete = _downloadComplete;
+                    transportStopped = _transportStopped;
                 }
 
                 if (decodeError is not null)
@@ -548,7 +550,6 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                     continue;
                 }
 
-                var output = EnsureOutput(provider);
                 var state = provider.GetState();
                 if (state.DownloadedDuration > lastDownloadedDuration)
                 {
@@ -559,6 +560,20 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                 {
                     TryDisposeStream(audioStream);
                     throw new TimeoutException("Поток OpenAI TTS не передавал новые аудиоданные 45 секунд.");
+                }
+
+                if (transportStopped)
+                {
+                    publishSnapshot(PlaybackSnapshot.Inactive);
+                    await Task.Delay(100, cancellationToken);
+                    continue;
+                }
+
+                var output = EnsureOutput(provider);
+                if (output is null)
+                {
+                    await Task.Delay(100, cancellationToken);
+                    continue;
                 }
 
                 bool startPlayback = false;
@@ -633,10 +648,15 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
                 await Task.Delay(100, cancellationToken);
             }
         }
-        private WaveOutEvent EnsureOutput(ProgressiveWaveProvider provider)
+        private WaveOutEvent? EnsureOutput(ProgressiveWaveProvider provider)
         {
             lock (_gate)
             {
+                if (_transportStopped || _disposed)
+                {
+                    return null;
+                }
+
                 if (_output is not null)
                 {
                     return _output;
@@ -743,6 +763,18 @@ public sealed class AudioPlaybackService(Dispatcher dispatcher, float outputVolu
             output.PlaybackStopped -= Output_PlaybackStopped;
             SafeStop(output);
             output.Dispose();
+        }
+
+        private void DisposeProvider()
+        {
+            ProgressiveWaveProvider? provider;
+            lock (_gate)
+            {
+                provider = _provider;
+                _provider = null;
+            }
+
+            provider?.Dispose();
         }
 
         private static void SafePlay(WaveOutEvent? output)

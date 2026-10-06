@@ -5,7 +5,10 @@ using WpfRect = System.Windows.Rect;
 
 namespace VoiceButton.Services;
 
-public sealed class CodexMicrophoneService(CodexWindowFinder windowFinder, AppSettings settings)
+public sealed class CodexMicrophoneService(
+    CodexWindowFinder windowFinder,
+    AppSettings settings,
+    DiagnosticsLogService diagnosticsLog)
 {
     public async Task<string> StartVoiceInputAsync(Action<string, string?> report, CancellationToken cancellationToken)
     {
@@ -25,15 +28,34 @@ public sealed class CodexMicrophoneService(CodexWindowFinder windowFinder, AppSe
         var microphoneButton = await FindMicrophoneButtonWithHoverAsync(window.Element, cancellationToken)
             ?? throw new InvalidOperationException($"Не нашел кнопку микрофона {window.AppName}. Открой поле ввода и попробуй снова.");
 
+        var before = CaptureVoiceInputState(window.Element, microphoneButton);
+        diagnosticsLog.Info("Application microphone", $"app={window.AppName}, action=first-click, {before.ToLogLine()}");
         InvokeOrClick(microphoneButton);
-        await Task.Delay(420, cancellationToken);
+        await Task.Delay(650, cancellationToken);
+
+        var after = CaptureVoiceInputState(window.Element);
+        diagnosticsLog.Info("Application microphone", $"app={window.AppName}, action=first-result, {after.ToLogLine()}");
 
         if (settings.RetryMicrophoneIfInactive
             && window.AppKind == AssistantAppKind.Codex
-            && !LooksVoiceInputActive(window.Element))
+            && ShouldRetry(before, after))
         {
-            InvokeOrClick(microphoneButton);
-            await Task.Delay(220, cancellationToken);
+            await Task.Delay(450, cancellationToken);
+            var retryState = CaptureVoiceInputState(window.Element);
+            if (ShouldRetry(before, retryState) && retryState.MicrophoneButton is not null)
+            {
+                diagnosticsLog.Info("Application microphone", $"app={window.AppName}, action=retry-click, {retryState.ToLogLine()}");
+                InvokeOrClick(retryState.MicrophoneButton);
+                await Task.Delay(350, cancellationToken);
+            }
+            else
+            {
+                diagnosticsLog.Info("Application microphone", $"app={window.AppName}, action=retry-skipped-late-change");
+            }
+        }
+        else
+        {
+            diagnosticsLog.Info("Application microphone", $"app={window.AppName}, action=retry-skipped");
         }
 
         return window.AppName;
@@ -175,6 +197,106 @@ public sealed class CodexMicrophoneService(CodexWindowFinder windowFinder, AppSe
         return false;
     }
 
+    private static VoiceInputState CaptureVoiceInputState(AutomationElement root, AutomationElement? knownButton = null)
+    {
+        var candidates = FindMicrophoneButtonCandidates(root);
+        var button = knownButton ?? candidates
+            .OrderByDescending(candidate => IsDictationButtonText(candidate.Text))
+            .ThenByDescending(candidate => candidate.Bounds.Bottom)
+            .ThenByDescending(candidate => candidate.Bounds.Right)
+            .Select(candidate => candidate.Element)
+            .FirstOrDefault();
+        var rootBounds = SafeBounds(root);
+        var controls = new List<string>();
+
+        try
+        {
+            var descendants = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+            foreach (AutomationElement element in descendants)
+            {
+                var bounds = SafeBounds(element);
+                if (bounds.IsEmpty
+                    || (!rootBounds.IsEmpty && bounds.Top < rootBounds.Bottom - Math.Min(230, rootBounds.Height * 0.30)))
+                {
+                    continue;
+                }
+
+                var type = SafeControlType(element);
+                if (type != ControlType.Button
+                    && type != ControlType.Edit
+                    && type != ControlType.Document
+                    && type != ControlType.ProgressBar)
+                {
+                    continue;
+                }
+
+                controls.Add($"{type.ProgrammaticName}|{SafeSearchText(element)}|{RoundBounds(bounds)}");
+            }
+        }
+        catch
+        {
+            // A disappearing accessibility node should only disable the retry.
+        }
+
+        var signature = string.Join(";", controls.OrderBy(value => value, StringComparer.Ordinal));
+        return new VoiceInputState(
+            button,
+            candidates.Count,
+            LooksVoiceInputActive(root),
+            signature,
+            button is null ? string.Empty : SafeSearchText(button),
+            button is null ? WpfRect.Empty : SafeBounds(button));
+    }
+
+    private static bool ShouldRetry(VoiceInputState before, VoiceInputState after)
+    {
+        if (after.LooksActive || after.MicrophoneButton is null)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(before.ComposerSignature)
+            || string.IsNullOrEmpty(after.ComposerSignature))
+        {
+            return false;
+        }
+
+        if (!string.Equals(before.ComposerSignature, after.ComposerSignature, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return string.Equals(before.ButtonText, after.ButtonText, StringComparison.Ordinal)
+            && SameBounds(before.ButtonBounds, after.ButtonBounds);
+    }
+
+    private static bool SameBounds(WpfRect first, WpfRect second)
+    {
+        return !first.IsEmpty
+            && !second.IsEmpty
+            && Math.Abs(first.Left - second.Left) < 2
+            && Math.Abs(first.Top - second.Top) < 2
+            && Math.Abs(first.Width - second.Width) < 2
+            && Math.Abs(first.Height - second.Height) < 2;
+    }
+
+    private static string RoundBounds(WpfRect bounds)
+    {
+        return $"{Math.Round(bounds.Left)},{Math.Round(bounds.Top)},{Math.Round(bounds.Width)},{Math.Round(bounds.Height)}";
+    }
+
+    private static ControlType? SafeControlType(AutomationElement element)
+    {
+        try
+        {
+            return element.Current.ControlType;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static bool IsDictationButtonText(string text)
     {
         return ContainsAny(text,
@@ -250,6 +372,20 @@ public sealed class CodexMicrophoneService(CodexWindowFinder windowFinder, AppSe
         {
             return WpfRect.Empty;
         }
+    }
+}
+
+internal sealed record VoiceInputState(
+    AutomationElement? MicrophoneButton,
+    int MicrophoneCandidateCount,
+    bool LooksActive,
+    string ComposerSignature,
+    string ButtonText,
+    WpfRect ButtonBounds)
+{
+    public string ToLogLine()
+    {
+        return $"micButtons={MicrophoneCandidateCount}, active={LooksActive}, button='{ButtonText}', bounds={ButtonBounds}, composerHash={ComposerSignature.GetHashCode(StringComparison.Ordinal)}";
     }
 }
 

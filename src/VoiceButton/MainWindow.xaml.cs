@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private readonly AppSettings _appSettings;
     private readonly ClipboardService _clipboardService = new();
     private readonly CodexWindowFinder _codexWindowFinder;
+    private readonly NoksIntegrationService _noksIntegrationService;
     private readonly CodexCopyService _codexCopyService;
     private readonly CodexMicrophoneService _codexMicrophoneService;
     private readonly CodexLiveNarrationMonitor _liveNarrationMonitor;
@@ -103,8 +104,17 @@ public partial class MainWindow : Window
         InitializeApiKeyStorage();
 
         _codexWindowFinder = new CodexWindowFinder(_appSettings);
-        _codexCopyService = new CodexCopyService(_codexWindowFinder, _clipboardService, _appSettings);
-        _codexMicrophoneService = new CodexMicrophoneService(_codexWindowFinder, _appSettings);
+        _noksIntegrationService = new NoksIntegrationService(
+            _codexWindowFinder,
+            _clipboardService,
+            _appSettings,
+            _diagnosticsLog);
+        _codexCopyService = new CodexCopyService(
+            _codexWindowFinder,
+            _clipboardService,
+            _appSettings,
+            _noksIntegrationService);
+        _codexMicrophoneService = new CodexMicrophoneService(_codexWindowFinder, _appSettings, _diagnosticsLog);
         _liveNarrationMonitor = new CodexLiveNarrationMonitor(_codexWindowFinder, _diagnosticsLog);
         _liveNarrationMonitor.SnapshotChanged += LiveNarrationMonitor_SnapshotChanged;
         _speechClient = new OpenAiSpeechClient(new HttpClient());
@@ -167,6 +177,7 @@ public partial class MainWindow : Window
         RestoreClipboardToggle.IsChecked = _appSettings.RestoreClipboardAfterCopy;
         ClipboardFallbackToggle.IsChecked = _appSettings.FallbackToClipboardWhenCopyMissing;
         RetryMicrophoneToggle.IsChecked = _appSettings.RetryMicrophoneIfInactive;
+        NoksIntegrationToggle.IsChecked = _appSettings.EnableNoksIntegration;
         LiveNarrationToggle.IsChecked = _appSettings.EnableCodexLiveNarration;
         InsertDictationToggle.IsChecked = _appSettings.InsertDictationAutomatically;
         RestoreDictationClipboardToggle.IsChecked = _appSettings.RestoreClipboardAfterDictation;
@@ -1050,6 +1061,7 @@ public partial class MainWindow : Window
         _appSettings.RestoreClipboardAfterCopy = RestoreClipboardToggle.IsChecked == true;
         _appSettings.FallbackToClipboardWhenCopyMissing = ClipboardFallbackToggle.IsChecked == true;
         _appSettings.RetryMicrophoneIfInactive = RetryMicrophoneToggle.IsChecked == true;
+        _appSettings.EnableNoksIntegration = NoksIntegrationToggle.IsChecked == true;
         var liveNarrationWasEnabled = _appSettings.EnableCodexLiveNarration;
         _appSettings.EnableCodexLiveNarration = LiveNarrationToggle.IsChecked == true;
         _appSettingsStore.Save(_appSettings);
@@ -1872,6 +1884,12 @@ public partial class MainWindow : Window
                 _appSettings.TranscriptionModel,
                 language,
                 run.Token);
+            if (await _noksIntegrationService.TrySendAddressedMessageAsync(text, SetCopyStatus, run.Token))
+            {
+                SetStatus(Tr("NoksMessageSent"), Tr("NoksMessageSentDetail"), "#41D6A1", busy: false);
+                return;
+            }
+
             var target = _dictationTarget ?? new DictationTarget(IntPtr.Zero, null, false, false, string.Empty, "unavailable");
             var delivery = await _dictationTextInsertionService.DeliverAsync(
                 target,
@@ -2659,6 +2677,7 @@ public partial class MainWindow : Window
         SetAutomationName(HoverCopyButtonToggle, HoverCopyButtonLabelText.Text, HoverCopyButtonHintText.Text);
         SetAutomationName(RestoreClipboardToggle, RestoreClipboardLabelText.Text, RestoreClipboardHintText.Text);
         SetAutomationName(ClipboardFallbackToggle, ClipboardFallbackLabelText.Text, ClipboardFallbackHintText.Text);
+        SetAutomationName(NoksIntegrationToggle, NoksIntegrationLabelText.Text, NoksIntegrationHintText.Text);
         SetAutomationName(LiveNarrationToggle, LiveNarrationLabelText.Text, LiveNarrationHintText.Text);
         SetAutomationName(RetryMicrophoneToggle, RetryMicrophoneLabelText.Text, RetryMicrophoneHintText.Text);
         SetAutomationName(TestCopyButton, TestCopyButton.Content?.ToString() ?? string.Empty, DiagnosticsHintText.Text);

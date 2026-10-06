@@ -17,4 +17,8 @@ applications, Voice Button records speech, transcribes it with OpenAI, and
 attempts to paste the text into the field that had focus when recording began.
 The transcript remains available in the clipboard when insertion is uncertain.
 
+Optional Noks integration recognizes dictation that begins with "Noks" or
+"Нокс", sends the remaining text to the pinned Noks chat in Codex, and lets
+the speaker control read the latest Noks assistant response.
+
 Project: https://github.com/nick-nalivaiko/voice-button

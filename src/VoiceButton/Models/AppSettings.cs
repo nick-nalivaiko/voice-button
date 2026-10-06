@@ -38,6 +38,10 @@ public sealed class AppSettings
 
     public bool RetryMicrophoneIfInactive { get; set; } = true;
 
+    public bool EnableNoksIntegration { get; set; } = true;
+
+    public string NoksConversationName { get; set; } = "Noks";
+
     public bool EnableCodexLiveNarration { get; set; } = true;
 
     public bool HideFilePathsInSpeech { get; set; } = true;

@@ -19,6 +19,7 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **Real playback controls**: pause/resume, waveform seeking, elapsed time, previous/next navigation, and stop.
 - **Live Codex narration**: an optional attached corner control follows complete visible Codex work paragraphs, skips service activity labels, and plays each paragraph through the same seekable player.
 - **Universal dictation**: records speech, transcribes it with OpenAI, and inserts it into the focused input field or leaves it in the clipboard.
+- **Noks routing**: an optional Codex integration sends dictation beginning with `Noks`, `Nox`, `Knox`, or `Нокс` to the pinned Noks chat and reads its latest assistant reply through the normal clipboard speech path.
 - **Global hotkeys**: five configurable shortcuts cover the latest answer, clipboard speech, context-aware microphone action, sending recorded assistant input with Enter, and pausing or resuming live narration.
 - **Clipboard protection**: restores the previous clipboard value when possible.
 - **Speech cleanup**: removes or shortens paths, code, links, secrets, hashes, stack traces, tables, structured data, shell commands, and long numeric identifiers.
@@ -66,6 +67,8 @@ For standard editable controls, the previous clipboard value can be restored aft
 
 Codex and ChatGPT are explicit exceptions: the microphone action keeps using their own built-in dictation and does not send a second transcription request.
 
+With Noks integration enabled, begin a Voice Button dictation outside Codex with `Noks, ...`, `Hi Noks ...`, or `Нокс, ...`. Voice Button opens the pinned Noks chat in Codex, inserts the remainder, and sends it. When Noks is selected, the speaker copies the latest assistant bubble to the clipboard and uses the standard long-text speech pipeline; the yellow user bubble is excluded.
+
 ### Hotkeys
 
 Click a shortcut field and press the desired key combination. Changes are registered globally and saved automatically.
@@ -76,7 +79,7 @@ The fourth action sends the current built-in Codex or ChatGPT voice input by del
 
 ### Codex and ChatGPT integration
 
-Tune window detection, Copy discovery, clipboard restoration, microphone retry behavior, optional live Codex work narration, and diagnostics.
+Tune window detection, Copy discovery, clipboard restoration, safe microphone retry behavior, Noks routing, optional live Codex work narration, and diagnostics.
 
 ![Codex and ChatGPT integration settings](docs/screenshots/integration.png)
 

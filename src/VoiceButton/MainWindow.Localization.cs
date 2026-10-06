@@ -154,6 +154,11 @@ public partial class MainWindow
         ["RestoreClipboardHint"] = new[] { "После Copy возвращает прежний буфер обмена, если это возможно.", "Після Copy повертає попередній буфер обміну, якщо це можливо.", "After Copy, restores the previous clipboard when possible." },
         ["ClipboardFallbackLabel"] = new[] { "Озвучивать clipboard без Copy", "Озвучувати clipboard без Copy", "Use clipboard if Copy fails" },
         ["ClipboardFallbackHint"] = new[] { "Если Copy не найден, можно озвучить уже скопированный вручную текст.", "Якщо Copy не знайдено, можна озвучити вже скопійований вручну текст.", "If Copy is missing, speak already-copied manual clipboard text." },
+        ["NoksIntegrationSectionTitle"] = new[] { "Noks", "Noks", "Noks" },
+        ["NoksIntegrationLabel"] = new[] { "Интеграция с Noks", "Інтеграція з Noks", "Noks integration" },
+        ["NoksIntegrationHint"] = new[] { "Команда «Noks, …» отправляет диктовку в закрепленный чат; динамик озвучивает его последний ответ.", "Команда «Noks, …» надсилає диктування в закріплений чат; динамік озвучує його останню відповідь.", "Saying “Noks, …” routes dictation to the pinned chat; the speaker reads its latest answer." },
+        ["NoksMessageSent"] = new[] { "Отправлено в Noks", "Надіслано в Noks", "Sent to Noks" },
+        ["NoksMessageSentDetail"] = new[] { "Сообщение вставлено и отправлено в чат Noks.", "Повідомлення вставлено й надіслано в чат Noks.", "The message was inserted and sent to the Noks chat." },
         ["LiveNarrationSectionTitle"] = new[] { "Озвучка хода работы Codex", "Озвучення ходу роботи Codex", "Codex work narration" },
         ["LiveNarrationLabel"] = new[] { "Включить live-озвучку", "Увімкнути live-озвучення", "Enable live narration" },
         ["LiveNarrationHint"] = new[] { "Показывает угловой индикатор на плавающей кнопке и озвучивает новые абзацы хода работы Codex.", "Показує кутовий індикатор на плаваючій кнопці та озвучує нові абзаци ходу роботи Codex.", "Shows a corner indicator on the floating control and narrates new Codex work paragraphs." },
@@ -170,7 +175,7 @@ public partial class MainWindow
         ["LiveNarrationUnavailableDetail"] = new[] { "Сначала включите функцию в разделе «Интеграция».", "Спочатку увімкніть функцію в розділі «Інтеграція».", "Enable the feature in Integration settings first." },
         ["MicrophoneIntegrationSectionTitle"] = new[] { "Микрофон приложений", "Мікрофон програм", "Application microphone" },
         ["RetryMicrophoneLabel"] = new[] { "Повторять запуск микрофона", "Повторювати запуск мікрофона", "Retry microphone launch" },
-        ["RetryMicrophoneHint"] = new[] { "Повторный клик применяется только к Codex; диктовка ChatGPT запускается один раз.", "Повторний клік застосовується лише до Codex; диктування ChatGPT запускається один раз.", "The retry applies only to Codex; ChatGPT dictation is started once." },
+        ["RetryMicrophoneHint"] = new[] { "Повторяет клик только если панель Codex не изменилась; активная запись не выключается.", "Повторює клік лише якщо панель Codex не змінилася; активний запис не вимикається.", "Retries only when the Codex input panel did not change; active recording is never toggled off." },
         ["DiagnosticsSectionTitle"] = new[] { "Диагностика", "Діагностика", "Diagnostics" },
         ["DiagnosticsLabel"] = new[] { "Проверить активное приложение", "Перевірити активну програму", "Check active application" },
         ["DiagnosticsHint"] = new[] { "Проверяет окно, Copy и микрофон. Результат пишется в diagnostics.log.", "Перевіряє вікно, Copy і мікрофон. Результат пишеться в diagnostics.log.", "Checks the window, Copy, and microphone. Results are written to diagnostics.log." },
@@ -326,6 +331,9 @@ public partial class MainWindow
         RestoreClipboardHintText.Text = Tr("RestoreClipboardHint");
         ClipboardFallbackLabelText.Text = Tr("ClipboardFallbackLabel");
         ClipboardFallbackHintText.Text = Tr("ClipboardFallbackHint");
+        NoksIntegrationSectionTitleText.Text = Tr("NoksIntegrationSectionTitle");
+        NoksIntegrationLabelText.Text = Tr("NoksIntegrationLabel");
+        NoksIntegrationHintText.Text = Tr("NoksIntegrationHint");
         LiveNarrationSectionTitleText.Text = Tr("LiveNarrationSectionTitle");
         LiveNarrationLabelText.Text = Tr("LiveNarrationLabel");
         LiveNarrationHintText.Text = Tr("LiveNarrationHint");

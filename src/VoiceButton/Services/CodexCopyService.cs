@@ -5,7 +5,11 @@ using WpfRect = System.Windows.Rect;
 
 namespace VoiceButton.Services;
 
-public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardService clipboardService, AppSettings settings)
+public sealed class CodexCopyService(
+    CodexWindowFinder windowFinder,
+    ClipboardService clipboardService,
+    AppSettings settings,
+    NoksIntegrationService noksIntegrationService)
 {
     private static readonly TimeSpan ClipboardTimeout = TimeSpan.FromSeconds(4);
 
@@ -39,6 +43,19 @@ public sealed class CodexCopyService(CodexWindowFinder windowFinder, ClipboardSe
 
         try
         {
+            if (offsetFromLatest == 0)
+            {
+                var noksAnswer = await noksIntegrationService.TryCopyLatestAnswerAsync(
+                    window,
+                    report,
+                    cancellationToken);
+                if (noksAnswer is not null)
+                {
+                    restoreClipboard = true;
+                    return new CopiedAssistantAnswer(noksAnswer.Text, 0, noksAnswer.AnswerCount);
+                }
+            }
+
             report($"Копирую из {window.AppName}", string.IsNullOrWhiteSpace(window.Title) ? window.ProcessName : window.Title);
             var search = await FindAnswerCopyButtonAsync(
                 window.Element,

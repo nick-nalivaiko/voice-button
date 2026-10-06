@@ -1,4 +1,6 @@
+using System.Buffers.Binary;
 using System.IO;
+using NAudio.Dsp;
 using NAudio.Wave;
 
 namespace VoiceButton.Services;
@@ -13,8 +15,11 @@ internal readonly record struct ProgressiveAudioState(
 internal sealed class ProgressiveWaveProvider : IWaveProvider, IDisposable
 {
     private const long MaxPcmBytes = 512L * 1024 * 1024;
+    private const float HighPassCutoffHz = 100f;
+    private const float LinkwitzRileyQ = 0.5f;
     private readonly object _gate = new();
     private readonly FileStream _audio;
+    private BiQuadFilter[] _highPassFilters;
     private long _length;
     private long _position;
     private bool _isComplete;
@@ -22,7 +27,13 @@ internal sealed class ProgressiveWaveProvider : IWaveProvider, IDisposable
 
     public ProgressiveWaveProvider(WaveFormat waveFormat)
     {
+        if (waveFormat.Encoding != WaveFormatEncoding.Pcm || waveFormat.BitsPerSample != 16)
+        {
+            throw new NotSupportedException("Фильтр воспроизведения поддерживает только 16-битный PCM.");
+        }
+
         WaveFormat = waveFormat;
+        _highPassFilters = CreateHighPassFilters();
         var directory = Path.Combine(Path.GetTempPath(), "VoiceButton", "pcm");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, $"{Guid.NewGuid():N}.pcm");
@@ -85,6 +96,7 @@ internal sealed class ProgressiveWaveProvider : IWaveProvider, IDisposable
             var blockAlign = Math.Max(1, WaveFormat.BlockAlign);
             target -= target % blockAlign;
             _position = Math.Clamp(target, 0, _length);
+            _highPassFilters = CreateHighPassFilters();
         }
     }
 
@@ -133,6 +145,7 @@ internal sealed class ProgressiveWaveProvider : IWaveProvider, IDisposable
                 _audio.Position = _position;
                 copied = _audio.Read(buffer, offset, copied);
                 _position += copied;
+                ApplyHighPassFilter(buffer, offset, copied);
             }
 
             if (copied == count || _isComplete)
@@ -164,5 +177,27 @@ internal sealed class ProgressiveWaveProvider : IWaveProvider, IDisposable
         return WaveFormat.AverageBytesPerSecond <= 0
             ? TimeSpan.Zero
             : TimeSpan.FromSeconds((double)byteCount / WaveFormat.AverageBytesPerSecond);
+    }
+
+    private BiQuadFilter[] CreateHighPassFilters()
+    {
+        return Enumerable.Range(0, WaveFormat.Channels)
+            .Select(_ => BiQuadFilter.HighPassFilter(WaveFormat.SampleRate, HighPassCutoffHz, LinkwitzRileyQ))
+            .ToArray();
+    }
+
+    private void ApplyHighPassFilter(byte[] buffer, int offset, int count)
+    {
+        var sampleCount = count / sizeof(short);
+        for (var sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
+        {
+            var byteOffset = offset + (sampleIndex * sizeof(short));
+            var sample = BinaryPrimitives.ReadInt16LittleEndian(buffer.AsSpan(byteOffset, sizeof(short))) / 32768f;
+            var filtered = _highPassFilters[sampleIndex % WaveFormat.Channels].Transform(sample);
+            var scaled = (int)Math.Round(filtered * 32768f);
+            BinaryPrimitives.WriteInt16LittleEndian(
+                buffer.AsSpan(byteOffset, sizeof(short)),
+                (short)Math.Clamp(scaled, short.MinValue, short.MaxValue));
+        }
     }
 }

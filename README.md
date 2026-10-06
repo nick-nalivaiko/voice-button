@@ -14,6 +14,7 @@ Voice Button is a compact Windows speech companion. It reads the latest **Codex*
 - **Latest answer only**: targets assistant Copy actions instead of reading the user's prompt.
 - **OpenAI text-to-speech**: model, voice, and playback speed are configurable.
 - **Buffered streaming playback**: warms up for at least two seconds, starts once ten seconds are buffered (or a shorter clip is complete), and protects a four-second reserve during network slowdowns.
+- **Voice-band cleanup**: applies a 100 Hz Linkwitz-Riley high-pass filter at 12 dB per octave to remove low-frequency rumble without changing the cached source audio.
 - **Floating controls**: microphone on the left, latest-answer speech on the right, right-click speaker playback for the clipboard, and an expanding player during playback.
 - **Real playback controls**: pause/resume, waveform seeking, elapsed time, previous/next navigation, and stop.
 - **Live Codex narration**: an optional attached corner control follows complete visible Codex work paragraphs, skips service activity labels, and plays each paragraph through the same seekable player.
